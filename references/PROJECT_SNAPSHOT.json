@@ -1,7 +1,7 @@
 {
   "projectMetadata": {
     "projectName": "dutch-parking-detection",
-    "projectVersion": "1.0.1",
+    "projectVersion": "1.0.2",
     "framework": "FastAPI (Backend) / React + Vite (Frontend)",
     "language": "Python / TypeScript",
     "createdAt": "2026-01-22T00:00:00Z",
@@ -166,7 +166,7 @@
     },
     {
       "chunkId": "frontend-components",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "category": "component",
       "files": [
         "new_frontend/components/AreaSelectorMap.tsx",
@@ -188,6 +188,12 @@
       "lastModified": "2026-01-22T00:00:00Z",
       "changeHistory": [
         {
+          "version": "1.0.2",
+          "date": "2026-01-22",
+          "type": "PATCH",
+          "description": "Switched AreaSelectorMap to use Google Maps tile layer"
+        },
+        {
           "version": "1.0.1",
           "date": "2026-01-22",
           "type": "PATCH",
@@ -203,6 +209,13 @@
     }
   ],
   "globalChangeLog": [
+    {
+      "version": "1.0.2",
+      "date": "2026-01-22",
+      "type": "PATCH",
+      "description": "Switched AreaSelectorMap to Google Maps",
+      "chunksAffected": ["frontend-components"]
+    },
     {
       "version": "1.0.1",
       "date": "2026-01-22",

@@ -72,12 +72,11 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
         // Add zoom control to bottom right
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // Add PDOK Dutch Aerial Imagery
-        L.tileLayer('https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/EPSG:3857/{z}/{x}/{y}.jpeg', {
-            minZoom: 6,
+        // Add Google Satellite Imagery
+        L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            minZoom: 1,
             maxZoom: 22,
-            maxNativeZoom: 19,
-            attribution: 'PDOK NL Aerial'
+            attribution: 'Google'
         }).addTo(map);
 
         // Calculate initial bounds centered on map

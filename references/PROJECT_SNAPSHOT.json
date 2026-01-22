@@ -1,7 +1,7 @@
 {
   "projectMetadata": {
     "projectName": "dutch-parking-detection",
-    "projectVersion": "1.0.8",
+    "projectVersion": "1.1.4",
     "framework": "FastAPI (Backend) / React + Vite (Frontend)",
     "language": "Python / TypeScript",
     "createdAt": "2026-01-22T00:00:00Z",
@@ -166,7 +166,7 @@
     },
     {
       "chunkId": "frontend-components",
-      "version": "1.0.8",
+      "version": "1.1.4",
       "category": "component",
       "files": [
         "new_frontend/components/AreaSelectorMap.tsx",
@@ -175,7 +175,8 @@
         "new_frontend/components/Dashboard.tsx",
         "new_frontend/components/ProcessingStatus.tsx",
         "new_frontend/components/SearchableSelect.tsx",
-        "new_frontend/components/JobHeader.tsx"
+        "new_frontend/components/JobHeader.tsx",
+        "new_frontend/components/Header.tsx"
       ],
       "purpose": "UI Components",
       "summary": "React components for the application UI, including maps, dashboards, and job management.",
@@ -191,124 +192,73 @@
       "lastModified": "2026-01-22T00:00:00Z",
       "changeHistory": [
         {
-          "version": "1.0.8",
-          "date": "2026-01-22",
-          "type": "PATCH",
-          "description": "Added logic to automatically fly to the selected municipality location in MapSection."
-        },
-        {
-          "version": "1.0.7",
-          "date": "2026-01-22",
-          "type": "PATCH",
-          "description": "Cleaned up redundant styling in municipality selector and added leadingIcon support to SearchableSelect."
-        },
-        {
-          "version": "1.0.6",
-          "date": "2026-01-22",
-          "type": "PATCH",
-          "description": "Increased AreaSelectorMap z-index to 5000 to cover JobHeader (z-2000)."
-        },
-        {
-          "version": "1.0.5",
-          "date": "2026-01-22",
-          "type": "PATCH",
-          "description": "Increased JobHeader z-index to 2000 to resolve overlap with MapSection (z-1001)."
-        },
-        {
-          "version": "1.0.4",
-          "date": "2026-01-22",
-          "type": "PATCH",
-          "description": "Fixed z-index issue where dropdown was covered by map section by establishing new stacking context in JobHeader."
-        },
-        {
-          "version": "1.0.3",
+          "version": "1.1.4",
           "date": "2026-01-22",
           "type": "MINOR",
-          "description": "Added all Dutch municipalities to the searchable dropdown, integrated Nominatim geocoding, and set pipeline status to closed by default. Fixed import path for dutch_municipalities.json."
+          "description": "Implemented reverse geocoding in AreaSelectorMap to display location names for the selected area."
         },
         {
-          "version": "1.0.2",
+          "version": "1.1.3",
+          "date": "2026-01-22",
+          "type": "MINOR",
+          "description": "Added coordinate input fields to the AreaSelectorMap modal for manual positioning."
+        },
+        {
+          "version": "1.1.2",
           "date": "2026-01-22",
           "type": "PATCH",
-          "description": "Switched AreaSelectorMap to use Google Maps tile layer"
+          "description": "Fixed boundary fetch logic and simplified list handling"
         },
         {
-          "version": "1.0.1",
+          "version": "1.1.1",
           "date": "2026-01-22",
           "type": "PATCH",
-          "description": "Fixed z-index overlap issue in AreaSelectorMap"
+          "description": "Updated municipality border style to a double-layered red/white dashed line for better visibility."
         },
         {
-          "version": "1.0.0",
+          "version": "1.1.0",
           "date": "2026-01-22",
-          "type": "MAJOR",
-          "description": "Initial snapshot"
+          "type": "MINOR",
+          "description": "Fixed header overlap issue by re-organizing z-index hierarchy across Header, JobHeader, and AreaSelectorMap."
         }
       ]
     }
   ],
   "globalChangeLog": [
     {
-      "version": "1.0.8",
-      "date": "2026-01-22",
-      "type": "PATCH",
-      "description": "Automated map centering on municipality selection",
-      "chunksAffected": ["frontend-components"]
-    },
-    {
-      "version": "1.0.7",
-      "date": "2026-01-22",
-      "type": "PATCH",
-      "description": "Improved municipality selector UI styling",
-      "chunksAffected": ["frontend-components"]
-    },
-    {
-      "version": "1.0.6",
-      "date": "2026-01-22",
-      "type": "PATCH",
-      "description": "Fixed modal layering issue against header",
-      "chunksAffected": ["frontend-components"]
-    },
-    {
-      "version": "1.0.5",
-      "date": "2026-01-22",
-      "type": "PATCH",
-      "description": "Final fix for dropdown z-index overlap",
-      "chunksAffected": ["frontend-components"]
-    },
-    {
-      "version": "1.0.4",
-      "date": "2026-01-22",
-      "type": "PATCH",
-      "description": "Fixed UI z-index layering for dropdown menus",
-      "chunksAffected": ["frontend-components"]
-    },
-    {
-      "version": "1.0.3",
+      "version": "1.1.4",
       "date": "2026-01-22",
       "type": "MINOR",
-      "description": "Added comprehensive municipality search and updated pipeline status",
+      "description": "Added location name display to analysis area map",
       "chunksAffected": ["frontend-components"]
     },
     {
-      "version": "1.0.2",
+      "version": "1.1.3",
+      "date": "2026-01-22",
+      "type": "MINOR",
+      "description": "Added manual coordinate input feature",
+      "chunksAffected": ["frontend-components"]
+    },
+    {
+      "version": "1.1.2",
       "date": "2026-01-22",
       "type": "PATCH",
-      "description": "Switched AreaSelectorMap to Google Maps",
+      "description": "Fixed boundary fetch logic and simplified list handling",
       "chunksAffected": ["frontend-components"]
     },
     {
-      "version": "1.0.1",
+      "version": "1.1.1",
       "date": "2026-01-22",
       "type": "PATCH",
-      "description": "Fixed UI overlap issue in AreaSelectorMap",
+      "description": "Improved visual style of municipality borders",
       "chunksAffected": ["frontend-components"]
     },
     {
-      "version": "1.0.0",
+      "version": "1.1.0",
       "date": "2026-01-22",
-      "type": "MAJOR",
-      "description": "Initial snapshot created"
+      "type": "MINOR",
+      "description": "Fixed header/content overlap issue",
+      "chunksAffected": ["frontend-components"]
     }
   ],
   "apiEndpoints": [

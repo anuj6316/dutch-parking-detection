@@ -19,6 +19,7 @@ interface MapSectionProps {
     gridCols?: number;
     gridRows?: number;
     onSpaceClick?: (id: string) => void;
+    municipalityPolygon?: any;
 }
 
 const MapSection: React.FC<MapSectionProps> = ({
@@ -30,7 +31,8 @@ const MapSection: React.FC<MapSectionProps> = ({
     tileConfigs = [],
     gridCols = 3,
     gridRows = 3,
-    onSpaceClick
+    onSpaceClick,
+    municipalityPolygon
 }) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<L.Map | null>(null);
@@ -39,6 +41,7 @@ const MapSection: React.FC<MapSectionProps> = ({
     const tilesLayerRef = useRef<L.LayerGroup | null>(null);
     const maskLayerRef = useRef<L.Polygon | null>(null);
     const bgtLayerRef = useRef<L.TileLayer.WMS | null>(null);
+    const boundaryLayerRef = useRef<L.GeoJSON | null>(null);
 
     const [baseLayer, setBaseLayer] = useState<'pdok' | 'google'>('google');
     const [showBGT, setShowBGT] = useState(false);
@@ -82,6 +85,55 @@ const MapSection: React.FC<MapSectionProps> = ({
         // Optionally fit bounds if they change significantly, but flyTo is usually sufficient for centering
         // mapInstanceRef.current.fitBounds([[bounds.minLat, bounds.minLng], [bounds.maxLat, bounds.maxLng]]);
     }, [center.lat, center.lng]);
+
+    // Render Municipality Polygon
+    useEffect(() => {
+        if (!mapInstanceRef.current) return;
+        const map = mapInstanceRef.current;
+
+        if (boundaryLayerRef.current) {
+            map.removeLayer(boundaryLayerRef.current);
+            boundaryLayerRef.current = null;
+        }
+
+        if (municipalityPolygon) {
+            boundaryLayerRef.current = L.geoJSON(municipalityPolygon, {
+                style: {
+                    color: '#ffffff', // White base
+                    weight: 3,
+                    opacity: 1,
+                    fillColor: 'transparent',
+                    fillOpacity: 0,
+                    dashArray: '10, 10',
+                    className: 'municipality-border'
+                },
+                interactive: false
+            }).addTo(map);
+
+            // Add a secondary dashed line on top for the "candy cane" or dashed effect
+            const secondaryLayer = L.geoJSON(municipalityPolygon, {
+                style: {
+                    color: '#ef4444', // Red segments
+                    weight: 3,
+                    opacity: 1,
+                    fill: false,
+                    dashArray: '10, 10',
+                    dashOffset: '10',
+                    className: 'municipality-border-red'
+                },
+                interactive: false
+            }).addTo(map);
+            
+            // Group them to manage together easily if needed, or just track the main one for removal
+            // For simplicity in this ref logic, we track the main layer. 
+            // Ideally, we should group them in a LayerGroup.
+            const group = L.layerGroup([boundaryLayerRef.current, secondaryLayer]).addTo(map);
+            boundaryLayerRef.current = group as any; // Cast to bypass strict type for now or update type
+            
+            // Optionally fit bounds to the municipality polygon
+            // map.fitBounds(boundaryLayerRef.current.getBounds());
+        }
+    }, [municipalityPolygon]);
 
     // Handle Base Layer Toggle
     useEffect(() => {

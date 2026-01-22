@@ -39,7 +39,7 @@ const JobHeader: React.FC<JobHeaderProps> = ({
     const displayName = useCustomArea ? (customAreaName || 'Custom Area') : (selectedArea?.name || 'Unknown Location');
 
     return (
-        <div className="flex flex-col gap-6 relative z-[2000]">
+        <div className="flex flex-col gap-6 relative">
             <div className="flex items-center gap-2 text-xs font-medium text-text-muted">
                 <button onClick={onBack} className="hover:text-white transition-colors">Dashboard</button>
                 <ChevronRight size={14} />

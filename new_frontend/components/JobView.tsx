@@ -22,11 +22,11 @@ const PREDEFINED_AREAS: Area[] = [
 // Merge predefined areas with municipalities
 const ALL_AREAS: Area[] = [
     ...PREDEFINED_AREAS,
-    ...municipalitiesList.filter(m => !PREDEFINED_AREAS.some(p => p.name.includes(m))).map(m => ({
+    ...municipalitiesList.map(m => ({
         id: m.toLowerCase().replace(/[^a-z0-9]/g, '-'),
         name: m,
         bbox: '' // Will be fetched on demand
-    }))
+    })).filter(m => !PREDEFINED_AREAS.some(p => p.id === m.id)) // Only dedup by exact ID match
 ];
 
 interface JobViewProps {
@@ -44,6 +44,7 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
     
     // State to hold fetched coordinates for municipalities
     const [dynamicBbox, setDynamicBbox] = useState<string | null>(null);
+    const [municipalityPolygon, setMunicipalityPolygon] = useState<any | null>(null);
     const [isFetchingLocation, setIsFetchingLocation] = useState(false);
 
     const selectedArea = ALL_AREAS.find(a => a.id === selectedAreaId) || PREDEFINED_AREAS[0];
@@ -52,31 +53,47 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
     const effectiveBbox = dynamicBbox || selectedArea.bbox || PREDEFINED_AREAS[0].bbox;
     const [predefinedLat, predefinedLng] = effectiveBbox.split(',').map(Number);
 
-    // Fetch coordinates when a municipality is selected
+    // Fetch coordinates/polygon when a municipality is selected
     useEffect(() => {
         const area = ALL_AREAS.find(a => a.id === selectedAreaId);
-        if (area && !area.bbox && !dynamicBbox) {
-            // It's a municipality without a bbox, fetch it
-            const fetchLocation = async () => {
-                setIsFetchingLocation(true);
-                try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(area.name)},Netherlands&format=json&limit=1`);
-                    const data = await response.json();
-                    if (data && data.length > 0) {
-                        const { lat, lon } = data[0];
+        if (!area) return;
+
+        const fetchLocation = async () => {
+            setIsFetchingLocation(true);
+            setMunicipalityPolygon(null); // Reset polygon while loading
+            
+            // Only reset dynamicBbox if we are switching to a completely new fetch
+            // But if we have a predefined bbox, we might not need dynamicBbox for centering,
+            // but we still might want to fetch the polygon.
+            if (area.bbox) {
+                setDynamicBbox(null);
+            }
+
+            try {
+                // Fetch for both dynamic and predefined to get the polygon
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(area.name)},Netherlands&format=json&limit=1&polygon_geojson=1`);
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    const { lat, lon, geojson } = data[0];
+                    
+                    // Only set dynamic bbox if the area doesn't have one hardcoded
+                    if (!area.bbox) {
                         setDynamicBbox(`${lat},${lon}`);
                     }
-                } catch (error) {
-                    console.error("Failed to fetch location:", error);
-                } finally {
-                    setIsFetchingLocation(false);
+                    
+                    if (geojson && (geojson.type === 'Polygon' || geojson.type === 'MultiPolygon')) {
+                        setMunicipalityPolygon(geojson);
+                    }
                 }
-            };
-            fetchLocation();
-        } else if (area && area.bbox) {
-            // It's a predefined area, reset dynamic bbox
-            setDynamicBbox(null);
-        }
+            } catch (error) {
+                console.error("Failed to fetch location:", error);
+            } finally {
+                setIsFetchingLocation(false);
+            }
+        };
+
+        fetchLocation();
     }, [selectedAreaId]);
 
     // Scaling predefined bounds to cover ~420m x 350m (exactly 6x5 grid of 30 blocks)
@@ -220,6 +237,7 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
                     gridCols={gridDimensions.cols}
                     gridRows={gridDimensions.rows}
                     onSpaceClick={handleLocateSpace}
+                    municipalityPolygon={municipalityPolygon}
                 />
                 <SidebarInfo locationInfo={locationInfo} />
             </div>

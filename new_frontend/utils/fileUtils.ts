@@ -1,0 +1,75 @@
+import { API_ENDPOINTS } from '../src/api/config';
+
+export interface SaveImageResult {
+  success: boolean;
+  filePath?: string;
+  error?: string;
+}
+
+export const saveMergedImage = async (
+  dataUrl: string,
+  municipality: string,
+  index: number
+): Promise<SaveImageResult> => {
+  try {
+    const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+
+    const response = await fetch(API_ENDPOINTS.SAVE_IMAGES, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        images: [{ image_base64: base64Data, index }],
+        municipality
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to save image: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log(`[FileUtils] Saved image via backend: ${result.files?.[0]}`);
+
+    return { success: true, filePath: result.files?.[0] };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[FileUtils] Failed to save merged image:`, error);
+    return { success: false, error: errorMessage };
+  }
+};
+
+export const saveAllMergedImages = async (
+  dataUrls: string[],
+  municipality: string
+): Promise<SaveImageResult> => {
+  try {
+    const images = dataUrls.map((dataUrl, index) => {
+      const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+      return { image_base64: base64Data, index };
+    });
+
+    const response = await fetch(API_ENDPOINTS.SAVE_IMAGES, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ images, municipality })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to save images: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log(`[FileUtils] Saved ${result.saved_count} images via backend`);
+
+    return { success: true, filePath: `Saved ${result.saved_count} files` };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[FileUtils] Failed to save merged images:`, error);
+    return { success: false, error: errorMessage };
+  }
+};
+
+export const base64ToBuffer = (dataUrl: string): Buffer => {
+  const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+  return Buffer.from(base64Data, 'base64');
+};

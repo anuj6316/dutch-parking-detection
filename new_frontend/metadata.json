@@ -1,0 +1,5 @@
+{
+  "name": "Dutch Parking Detection",
+  "description": "A dashboard for parking detection analysis jobs using satellite imagery, featuring a detailed job view with metrics, visualization, and data exports.",
+  "requestFramePermissions": []
+}

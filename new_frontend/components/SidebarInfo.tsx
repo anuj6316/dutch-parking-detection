@@ -1,0 +1,126 @@
+import React from 'react';
+import { FileJson, FileSpreadsheet, Download, Map, ExternalLink } from 'lucide-react';
+import { LocationInfo } from '../types';
+
+interface SidebarInfoProps {
+    locationInfo?: LocationInfo | null;
+}
+
+const SidebarInfo: React.FC<SidebarInfoProps> = ({ locationInfo }) => {
+    const handleDownload = (format: string) => {
+        alert(`Downloading ${format} export...`);
+    };
+
+    return (
+        <div className="flex flex-col gap-6">
+            {/* Location Intelligence (Maps Grounding) */}
+            <div className="rounded-xl bg-card-dark border border-white/5 p-6 flex flex-col gap-4">
+                <div className="flex items-center gap-2">
+                    <Map size={20} className="text-primary" />
+                    <h3 className="text-white font-bold text-lg">Location Intelligence</h3>
+                </div>
+                
+                {locationInfo ? (
+                    <div className="flex flex-col gap-4 animate-in fade-in duration-500">
+                        <p className="text-sm text-gray-300 leading-relaxed">
+                            {locationInfo.summary}
+                        </p>
+                        
+                        {locationInfo.chunks && locationInfo.chunks.length > 0 && (
+                            <div className="flex flex-col gap-2 mt-2 pt-4 border-t border-white/5">
+                                <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Sources</span>
+                                {locationInfo.chunks.map((chunk, idx) => {
+                                    const source = chunk.maps || chunk.web;
+                                    if (!source || !source.uri) return null;
+                                    return (
+                                        <a 
+                                            key={idx}
+                                            href={source.uri}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 text-xs text-[#0bda95] hover:underline truncate"
+                                        >
+                                            <ExternalLink size={10} />
+                                            {source.title || 'Google Maps'}
+                                        </a>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <p className="text-text-muted text-sm italic">
+                        Run analysis to fetch parking insights from Google Maps...
+                    </p>
+                )}
+            </div>
+
+            {/* Downloads Card */}
+            <div className="rounded-xl bg-card-dark border border-white/5 p-6 flex flex-col gap-4">
+                <h3 className="text-white font-bold text-lg">Results Data</h3>
+                <p className="text-text-muted text-sm">Download the processed data for integration with external municipal systems.</p>
+                <div className="flex flex-col gap-3 mt-2">
+                    <button 
+                        onClick={() => handleDownload('GeoJSON')}
+                        className="group flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-[#2d2222] rounded text-[#0bda95]">
+                                <FileJson size={20} />
+                            </div>
+                            <div className="flex flex-col items-start">
+                                <span className="text-white text-sm font-bold">GeoJSON</span>
+                                <span className="text-text-muted text-xs">Vector data (2.4 MB)</span>
+                            </div>
+                        </div>
+                        <Download size={18} className="text-text-muted group-hover:text-white" />
+                    </button>
+                    <button 
+                        onClick={() => handleDownload('CSV')}
+                        className="group flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-[#2d2222] rounded text-primary">
+                                <FileSpreadsheet size={20} />
+                            </div>
+                            <div className="flex flex-col items-start">
+                                <span className="text-white text-sm font-bold">CSV Report</span>
+                                <span className="text-text-muted text-xs">Spreadsheet (850 KB)</span>
+                            </div>
+                        </div>
+                        <Download size={18} className="text-text-muted group-hover:text-white" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Job Information */}
+            <div className="rounded-xl bg-card-dark border border-white/5 p-6 flex-1">
+                <h3 className="text-white font-bold text-lg mb-4">Job Information</h3>
+                <div className="flex flex-col gap-4">
+                    <div className="flex justify-between items-center py-2 border-b border-white/5">
+                        <span className="text-text-muted text-sm">Created At</span>
+                        <span className="text-white text-sm font-mono">Oct 24, 14:00</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-white/5">
+                        <span className="text-text-muted text-sm">Completed At</span>
+                        <span className="text-white text-sm font-mono">Oct 24, 14:05</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-white/5">
+                        <span className="text-text-muted text-sm">Source ID</span>
+                        <span className="text-white text-sm font-mono">IMG_8842_NL</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-white/5">
+                        <span className="text-text-muted text-sm">Resolution</span>
+                        <span className="text-white text-sm font-mono">10cm / px</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                        <span className="text-text-muted text-sm">Model Version</span>
+                        <span className="inline-flex items-center rounded bg-white/10 px-2 py-0.5 text-xs font-medium text-white">v2.4.1-stable</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default SidebarInfo;

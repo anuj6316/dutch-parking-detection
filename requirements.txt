@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+python-multipart
+ultralytics
+torch
+numpy
+Pillow
+requests
+python-dotenv
+google-genai
+opencv-python
+git+https://github.com/huggingface/transformers.git
+matplotlib
+poethepoet
+shapely

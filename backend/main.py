@@ -67,7 +67,7 @@ def health_check():
 
 
 SAVE_DIR = Path(
-    "/home/mindmap/Documents/dutch-parking-detection/new_frontend/public/merged-images"
+    "./public/merged-images"
 )
 
 

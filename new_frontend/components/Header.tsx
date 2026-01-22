@@ -8,7 +8,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onNavigate, currentView }) => {
     return (
-        <div className="border-b border-card-border px-4 md:px-10 py-3 bg-background sticky top-0 z-50">
+        <div className="border-b border-card-border px-4 md:px-10 py-3 bg-background sticky top-0 z-[6000]">
             <header className="flex items-center justify-between whitespace-nowrap mx-auto max-w-[1400px]">
                 <div 
                     className="flex items-center gap-3 cursor-pointer group"

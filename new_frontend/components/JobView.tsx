@@ -9,8 +9,9 @@ import SpacesTable from './SpacesTable';
 import AreaSelectorMap from './AreaSelectorMap';
 import { useParkingAnalysis } from '../hooks/useParkingAnalysis';
 import { getDistanceMeters, METERS_PER_MERGED_BLOCK } from '../utils/geoUtils';
+import municipalitiesList from '../data/dutch_municipalities.json';
 
-const AREAS: Area[] = [
+const PREDEFINED_AREAS: Area[] = [
     { id: 'amersfoort', name: 'Amersfoort Station', bbox: '52.1538,5.3725' },
     { id: 'utrecht', name: 'Utrecht P+R Westraven', bbox: '52.0620,5.1060' },
     { id: 'amsterdam', name: 'Amsterdam Arena P1', bbox: '52.3120,4.9410' },
@@ -18,21 +19,82 @@ const AREAS: Area[] = [
     { id: 'eindhoven', name: 'Eindhoven High Tech Campus', bbox: '51.4170,5.4610' },
 ];
 
+// Merge predefined areas with municipalities
+const ALL_AREAS: Area[] = [
+    ...PREDEFINED_AREAS,
+    ...municipalitiesList.map(m => ({
+        id: m.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        name: m,
+        bbox: '' // Will be fetched on demand
+    })).filter(m => !PREDEFINED_AREAS.some(p => p.id === m.id)) // Only dedup by exact ID match
+];
+
 interface JobViewProps {
     onBack: () => void;
 }
 
 const JobView: React.FC<JobViewProps> = ({ onBack }) => {
-    const [selectedAreaId, setSelectedAreaId] = useState<string>(AREAS[0].id);
+    const [selectedAreaId, setSelectedAreaId] = useState<string>(PREDEFINED_AREAS[0].id);
     const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
     const [useCustomArea, setUseCustomArea] = useState(false);
     const [showAreaSelector, setShowAreaSelector] = useState(false);
     const [customBounds, setCustomBounds] = useState<{
         minLat: number; maxLat: number; minLng: number; maxLng: number
     } | null>(null);
+    
+    // State to hold fetched coordinates for municipalities
+    const [dynamicBbox, setDynamicBbox] = useState<string | null>(null);
+    const [municipalityPolygon, setMunicipalityPolygon] = useState<any | null>(null);
+    const [isFetchingLocation, setIsFetchingLocation] = useState(false);
 
-    const selectedArea = AREAS.find(a => a.id === selectedAreaId) || AREAS[0];
-    const [predefinedLat, predefinedLng] = selectedArea.bbox.split(',').map(Number);
+    const selectedArea = ALL_AREAS.find(a => a.id === selectedAreaId) || PREDEFINED_AREAS[0];
+    
+    // Determine the active bbox: custom > dynamic (fetched) > predefined
+    const effectiveBbox = dynamicBbox || selectedArea.bbox || PREDEFINED_AREAS[0].bbox;
+    const [predefinedLat, predefinedLng] = effectiveBbox.split(',').map(Number);
+
+    // Fetch coordinates/polygon when a municipality is selected
+    useEffect(() => {
+        const area = ALL_AREAS.find(a => a.id === selectedAreaId);
+        if (!area) return;
+
+        const fetchLocation = async () => {
+            setIsFetchingLocation(true);
+            setMunicipalityPolygon(null); // Reset polygon while loading
+            
+            // Only reset dynamicBbox if we are switching to a completely new fetch
+            // But if we have a predefined bbox, we might not need dynamicBbox for centering,
+            // but we still might want to fetch the polygon.
+            if (area.bbox) {
+                setDynamicBbox(null);
+            }
+
+            try {
+                // Fetch for both dynamic and predefined to get the polygon
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(area.name)},Netherlands&format=json&limit=1&polygon_geojson=1`);
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    const { lat, lon, geojson } = data[0];
+                    
+                    // Only set dynamic bbox if the area doesn't have one hardcoded
+                    if (!area.bbox) {
+                        setDynamicBbox(`${lat},${lon}`);
+                    }
+                    
+                    if (geojson && (geojson.type === 'Polygon' || geojson.type === 'MultiPolygon')) {
+                        setMunicipalityPolygon(geojson);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to fetch location:", error);
+            } finally {
+                setIsFetchingLocation(false);
+            }
+        };
+
+        fetchLocation();
+    }, [selectedAreaId]);
 
     // Scaling predefined bounds to cover ~420m x 350m (exactly 6x5 grid of 30 blocks)
     // 0.003 deg Lat is ~333m. 0.006 deg Lng is ~420m at Lat 52.
@@ -143,7 +205,7 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
                 onRerun={handleRunClick}
                 isAnalyzing={isAnalyzing}
                 onBack={onBack}
-                areas={AREAS}
+                areas={ALL_AREAS}
                 selectedAreaId={selectedAreaId}
                 onAreaChange={setSelectedAreaId}
                 detectionConfidence={detectionConfidence}
@@ -175,6 +237,7 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
                     gridCols={gridDimensions.cols}
                     gridRows={gridDimensions.rows}
                     onSpaceClick={handleLocateSpace}
+                    municipalityPolygon={municipalityPolygon}
                 />
                 <SidebarInfo locationInfo={locationInfo} />
             </div>

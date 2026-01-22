@@ -29,6 +29,28 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
         maxLng: number;
     } | null>(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [manualCoords, setManualCoords] = useState<{lat: string, lng: string}>({ 
+        lat: initialCenter.lat.toFixed(5), 
+        lng: initialCenter.lng.toFixed(5) 
+    });
+    const [locationName, setLocationName] = useState<string | null>(null);
+
+    const fetchLocationName = async (lat: number, lng: number) => {
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
+            const data = await response.json();
+            if (data && data.address) {
+                const addr = data.address;
+                const name = addr.road || addr.suburb || addr.neighbourhood || addr.hamlet || "Unknown Street";
+                const city = addr.city || addr.town || addr.village || addr.municipality || "";
+                setLocationName(city ? `${name}, ${city}` : name);
+            } else if (data && data.display_name) {
+                 setLocationName(data.display_name.split(',')[0]);
+            }
+        } catch (error) {
+            console.error("Reverse geocode failed:", error);
+        }
+    };
 
     // Calculate bounds from center point
     const calculateBoundsFromCenter = (lat: number, lng: number) => {
@@ -57,6 +79,27 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
             ]);
         }
         setCurrentBounds(bounds);
+        // Update manual inputs to reflect center
+        const centerLat = (bounds.minLat + bounds.maxLat) / 2;
+        const centerLng = (bounds.minLng + bounds.maxLng) / 2;
+        setManualCoords({
+            lat: centerLat.toFixed(5),
+            lng: centerLng.toFixed(5)
+        });
+    };
+
+    const handleManualInputSubmit = () => {
+        const lat = parseFloat(manualCoords.lat);
+        const lng = parseFloat(manualCoords.lng);
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+            const newBounds = calculateBoundsFromCenter(lat, lng);
+            updateRectangle(newBounds);
+            if (mapInstanceRef.current) {
+                mapInstanceRef.current.flyTo([lat, lng], 17);
+            }
+            fetchLocationName(lat, lng);
+        }
     };
 
     useEffect(() => {
@@ -72,12 +115,11 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
         // Add zoom control to bottom right
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // Add PDOK Dutch Aerial Imagery
-        L.tileLayer('https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/EPSG:3857/{z}/{x}/{y}.jpeg', {
-            minZoom: 6,
+        // Add Google Satellite Imagery
+        L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            minZoom: 1,
             maxZoom: 22,
-            maxNativeZoom: 19,
-            attribution: 'PDOK NL Aerial'
+            attribution: 'Google'
         }).addTo(map);
 
         // Calculate initial bounds centered on map
@@ -98,6 +140,7 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
 
         rectangleRef.current = rectangle;
         setCurrentBounds(initialBounds);
+        fetchLocationName(initialCenter.lat, initialCenter.lng);
 
         // Variables for dragging
         let dragStartLatLng: L.LatLng | null = null;
@@ -129,6 +172,17 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
                 map.dragging.enable();
                 map.off('mousemove', onMouseMove);
                 map.off('mouseup', onMouseUp);
+                
+                // Fetch location on drag end
+                if (rectCenterAtDragStart && dragStartLatLng) {
+                     // Need to calculate final center
+                     // Actually, updateRectangle has been called with final bounds.
+                     // But we don't have the final center easily available in this scope unless we recalc or read from state (which is stale in closure)
+                     // Better to read from rectangle
+                     const finalCenter = rectangle.getBounds().getCenter();
+                     fetchLocationName(finalCenter.lat, finalCenter.lng);
+                }
+
                 dragStartLatLng = null;
                 rectCenterAtDragStart = null;
                 setIsDragging(false);
@@ -142,6 +196,7 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
         map.on('dblclick', (e: L.LeafletMouseEvent) => {
             const newBounds = calculateBoundsFromCenter(e.latlng.lat, e.latlng.lng);
             updateRectangle(newBounds);
+            fetchLocationName(e.latlng.lat, e.latlng.lng);
 
             // Optionally pan map to center on rectangle
             map.panTo(e.latlng);
@@ -168,11 +223,12 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
             const center = mapInstanceRef.current.getCenter();
             const newBounds = calculateBoundsFromCenter(center.lat, center.lng);
             updateRectangle(newBounds);
+            fetchLocationName(center.lat, center.lng);
         }
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[7000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="w-full max-w-5xl h-[80vh] bg-card-dark rounded-2xl border border-white/10 overflow-hidden flex flex-col shadow-2xl">
                 {/* Header */}
                 <div className="p-4 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-primary/10 to-transparent">
@@ -182,15 +238,48 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
                         </div>
                         <div>
                             <h2 className="text-white font-bold text-lg">Position Analysis Area</h2>
-                            <p className="text-text-muted text-sm">Drag the rectangle or double-click to position it over parking spaces</p>
+                            <p className="text-text-muted text-sm flex items-center gap-2">
+                                {locationName ? (
+                                    <span className="text-white font-medium">{locationName}</span>
+                                ) : (
+                                    "Drag the rectangle or double-click to position"
+                                )}
+                            </p>
                         </div>
                     </div>
-                    <button
-                        onClick={onCancel}
-                        className="p-2 rounded-lg hover:bg-white/10 transition-colors text-text-muted hover:text-white"
-                    >
-                        <X size={20} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center bg-black/40 rounded-lg p-1 border border-white/10">
+                            <input 
+                                type="text" 
+                                value={manualCoords.lat}
+                                onChange={(e) => setManualCoords({...manualCoords, lat: e.target.value})}
+                                onKeyDown={(e) => e.key === 'Enter' && handleManualInputSubmit()}
+                                placeholder="Lat"
+                                className="bg-transparent border-none w-20 text-xs text-white text-center focus:ring-0"
+                            />
+                            <div className="w-[1px] h-4 bg-white/10"></div>
+                            <input 
+                                type="text" 
+                                value={manualCoords.lng}
+                                onChange={(e) => setManualCoords({...manualCoords, lng: e.target.value})}
+                                onKeyDown={(e) => e.key === 'Enter' && handleManualInputSubmit()}
+                                placeholder="Lng"
+                                className="bg-transparent border-none w-20 text-xs text-white text-center focus:ring-0"
+                            />
+                            <button 
+                                onClick={handleManualInputSubmit}
+                                className="p-1.5 hover:bg-white/10 rounded-md transition-colors"
+                            >
+                                <Check size={12} className="text-primary" />
+                            </button>
+                        </div>
+                        <button
+                            onClick={onCancel}
+                            className="p-2 rounded-lg hover:bg-white/10 transition-colors text-text-muted hover:text-white"
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Map Container */}

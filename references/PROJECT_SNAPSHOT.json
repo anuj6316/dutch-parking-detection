@@ -1,7 +1,7 @@
 {
   "projectMetadata": {
     "projectName": "dutch-parking-detection",
-    "projectVersion": "1.0.2",
+    "projectVersion": "1.0.6",
     "framework": "FastAPI (Backend) / React + Vite (Frontend)",
     "language": "Python / TypeScript",
     "createdAt": "2026-01-22T00:00:00Z",
@@ -166,13 +166,16 @@
     },
     {
       "chunkId": "frontend-components",
-      "version": "1.0.2",
+      "version": "1.0.6",
       "category": "component",
       "files": [
         "new_frontend/components/AreaSelectorMap.tsx",
         "new_frontend/components/JobView.tsx",
         "new_frontend/components/MapSection.tsx",
-        "new_frontend/components/Dashboard.tsx"
+        "new_frontend/components/Dashboard.tsx",
+        "new_frontend/components/ProcessingStatus.tsx",
+        "new_frontend/components/SearchableSelect.tsx",
+        "new_frontend/components/JobHeader.tsx"
       ],
       "purpose": "UI Components",
       "summary": "React components for the application UI, including maps, dashboards, and job management.",
@@ -187,6 +190,30 @@
       },
       "lastModified": "2026-01-22T00:00:00Z",
       "changeHistory": [
+        {
+          "version": "1.0.6",
+          "date": "2026-01-22",
+          "type": "PATCH",
+          "description": "Increased AreaSelectorMap z-index to 5000 to cover JobHeader (z-2000)."
+        },
+        {
+          "version": "1.0.5",
+          "date": "2026-01-22",
+          "type": "PATCH",
+          "description": "Increased JobHeader z-index to 2000 to resolve overlap with MapSection (z-1001)."
+        },
+        {
+          "version": "1.0.4",
+          "date": "2026-01-22",
+          "type": "PATCH",
+          "description": "Fixed z-index issue where dropdown was covered by map section by establishing new stacking context in JobHeader."
+        },
+        {
+          "version": "1.0.3",
+          "date": "2026-01-22",
+          "type": "MINOR",
+          "description": "Added all Dutch municipalities to the searchable dropdown, integrated Nominatim geocoding, and set pipeline status to closed by default. Fixed import path for dutch_municipalities.json."
+        },
         {
           "version": "1.0.2",
           "date": "2026-01-22",
@@ -209,6 +236,34 @@
     }
   ],
   "globalChangeLog": [
+    {
+      "version": "1.0.6",
+      "date": "2026-01-22",
+      "type": "PATCH",
+      "description": "Fixed modal layering issue against header",
+      "chunksAffected": ["frontend-components"]
+    },
+    {
+      "version": "1.0.5",
+      "date": "2026-01-22",
+      "type": "PATCH",
+      "description": "Final fix for dropdown z-index overlap",
+      "chunksAffected": ["frontend-components"]
+    },
+    {
+      "version": "1.0.4",
+      "date": "2026-01-22",
+      "type": "PATCH",
+      "description": "Fixed UI z-index layering for dropdown menus",
+      "chunksAffected": ["frontend-components"]
+    },
+    {
+      "version": "1.0.3",
+      "date": "2026-01-22",
+      "type": "MINOR",
+      "description": "Added comprehensive municipality search and updated pipeline status",
+      "chunksAffected": ["frontend-components"]
+    },
     {
       "version": "1.0.2",
       "date": "2026-01-22",

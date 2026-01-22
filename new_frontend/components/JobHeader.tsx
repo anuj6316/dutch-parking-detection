@@ -1,5 +1,6 @@
 import React from 'react';
-import { ChevronRight, RefreshCw, Download, RotateCcw, PenTool, List, MapPin, ChevronDown } from 'lucide-react';
+import { ChevronRight, RefreshCw, Download, RotateCcw, PenTool, List, MapPin } from 'lucide-react';
+import SearchableSelect from './SearchableSelect';
 
 export interface Area {
     id: string;
@@ -38,7 +39,7 @@ const JobHeader: React.FC<JobHeaderProps> = ({
     const displayName = useCustomArea ? (customAreaName || 'Custom Area') : (selectedArea?.name || 'Unknown Location');
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 relative z-[2000]">
             <div className="flex items-center gap-2 text-xs font-medium text-text-muted">
                 <button onClick={onBack} className="hover:text-white transition-colors">Dashboard</button>
                 <ChevronRight size={14} />
@@ -79,22 +80,15 @@ const JobHeader: React.FC<JobHeaderProps> = ({
 
                         {!useCustomArea && (
                             <div className="relative">
-                                <div className="flex items-center gap-2 bg-[#1c2128] border border-card-border rounded-md px-3 py-1 transition-all hover:border-primary/50">
-                                    <MapPin size={14} className="text-primary" />
-                                    <select 
-                                        value={selectedAreaId} 
-                                        onChange={(e) => onAreaChange(e.target.value)}
-                                        className="appearance-none bg-transparent border-none text-white text-xs font-bold focus:ring-0 cursor-pointer py-0 pl-0 pr-8 min-w-[150px]"
-                                    >
-                                        {areas.map(a => (
-                                            <option key={a.id} value={a.id} className="bg-card text-white">
-                                                {a.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                                        <ChevronDown size={14} className="text-text-muted" />
-                                    </div>
+                                <div className="flex items-center gap-2 bg-[#1c2128] border border-card-border rounded-md px-1 py-1 transition-all hover:border-primary/50 min-w-[200px]">
+                                    <MapPin size={14} className="text-primary ml-2" />
+                                    <SearchableSelect
+                                        options={areas.map(a => ({ id: a.id, label: a.name }))}
+                                        value={selectedAreaId}
+                                        onChange={onAreaChange}
+                                        placeholder="Select municipality..."
+                                        className="w-full border-none"
+                                    />
                                 </div>
                             </div>
                         )}

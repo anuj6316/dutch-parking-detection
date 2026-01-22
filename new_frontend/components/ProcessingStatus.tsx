@@ -17,7 +17,7 @@ interface ProcessingStatusProps {
 }
 
 const ProcessingStatus: React.FC<ProcessingStatusProps> = ({ status, images = [], maskedImages, statusDetails, spaces = [], logs = [] }) => {
-    const [expanded, setExpanded] = useState(true);
+    const [expanded, setExpanded] = useState(false);
     const [activeSection, setActiveSection] = useState<string | null>('tiles');
 
     const steps = [

@@ -1,5 +1,5 @@
-import React from 'react';
-import { ChevronRight, RefreshCw, Download, RotateCcw, PenTool, List, MapPin } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronRight, RefreshCw, Download, RotateCcw, PenTool, List, MapPin, Settings } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
 export interface Area {
@@ -20,6 +20,8 @@ interface JobHeaderProps {
     useCustomArea: boolean;
     onToggleCustomArea: () => void;
     customAreaName?: string;
+    totalImages: number;
+    setTotalImages: (count: number) => void;
 }
 
 const JobHeader: React.FC<JobHeaderProps> = ({
@@ -33,13 +35,30 @@ const JobHeader: React.FC<JobHeaderProps> = ({
     setDetectionConfidence,
     useCustomArea,
     onToggleCustomArea,
-    customAreaName
+    customAreaName,
+    totalImages,
+    setTotalImages
 }) => {
     const selectedArea = areas.find(a => a.id === selectedAreaId);
     const displayName = useCustomArea ? (customAreaName || 'Custom Area') : (selectedArea?.name || 'Unknown Location');
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const advancedRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (advancedRef.current && !advancedRef.current.contains(event.target as Node)) {
+                setShowAdvanced(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     return (
-        <div className="flex flex-col gap-6 relative">
+        <div className="flex flex-col gap-6 relative z-[500]">
             <div className="flex items-center gap-2 text-xs font-medium text-text-muted">
                 <button onClick={onBack} className="hover:text-white transition-colors">Dashboard</button>
                 <ChevronRight size={14} />
@@ -91,21 +110,103 @@ const JobHeader: React.FC<JobHeaderProps> = ({
                             </div>
                         )}
 
-                        <div className="flex items-center gap-2">
-                            <label htmlFor="confidence-threshold" className="text-text-muted text-sm font-medium">Confidence:</label>
-                            <input
-                                type="range"
-                                id="confidence-threshold"
-                                min="0.0"
-                                max="1.0"
-                                step="0.05"
-                                value={detectionConfidence}
-                                onChange={(e) => setDetectionConfidence(parseFloat(e.target.value))}
-                                className="w-24 h-2 rounded-lg appearance-none cursor-pointer bg-primary/50 accent-primary"
-                                disabled={isAnalyzing}
-                            />
-                            <span className="text-white text-sm font-mono">{detectionConfidence.toFixed(2)}</span>
+                        <div className="relative" ref={advancedRef}>
+                            <button
+                                onClick={() => setShowAdvanced(!showAdvanced)}
+                                className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                                    showAdvanced 
+                                    ? 'bg-primary/20 border-primary text-white' 
+                                    : 'bg-[#1c2128] border-card-border text-text-muted hover:text-white hover:border-white/20'
+                                }`}
+                                title="Advanced Options"
+                            >
+                                <Settings size={16} />
+                            </button>
+
+                            {showAdvanced && (
+                                <div className="absolute top-full mt-2 right-0 bg-[#1c2128] border border-card-border rounded-xl p-5 shadow-2xl z-[1000] w-80 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-white text-xs font-bold uppercase tracking-widest">Advanced Settings</h3>
+                                        <Settings size={12} className="text-primary/50" />
+                                    </div>
+                                    
+                                    <div className="flex flex-col gap-5">
+                                        <div className="flex flex-col gap-3">
+                                            <div className="flex justify-between items-center">
+                                                <label htmlFor="confidence-threshold" className="text-text-muted text-xs font-medium">Confidence Threshold</label>
+                                                <span className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded font-mono font-bold border border-primary/20">
+                                                    {Math.round(detectionConfidence * 100)}%
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                id="confidence-threshold"
+                                                min="0.0"
+                                                max="1.0"
+                                                step="0.05"
+                                                value={detectionConfidence}
+                                                onChange={(e) => setDetectionConfidence(parseFloat(e.target.value))}
+                                                className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-white/5 accent-primary hover:accent-primary/80 transition-all"
+                                                disabled={isAnalyzing}
+                                            />
+                                            <div className="flex justify-between text-[9px] text-white/20 font-mono tracking-tighter">
+                                                <span>LOOSE</span>
+                                                <span>BALANCED</span>
+                                                <span>STRICT</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col gap-4 border-t border-white/5 pt-5">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label htmlFor="total-images" className="text-text-muted text-xs font-medium uppercase tracking-wider">Analysis Scale</label>
+                                                    <span className="text-[9px] text-primary/60 font-medium">Number of images to process</span>
+                                                </div>
+                                                <div className="flex items-center bg-black/40 border border-white/10 rounded-lg p-1 group-focus-within:border-primary/50 transition-all">
+                                                    <input 
+                                                        type="number"
+                                                        id="total-images-input"
+                                                        value={totalImages}
+                                                        onChange={(e) => setTotalImages(Math.max(1, Math.min(1000, parseInt(e.target.value) || 1)))}
+                                                        className="w-16 bg-transparent border-none text-xs text-white text-center focus:ring-0 py-0.5 font-mono font-bold"
+                                                    />
+                                                </div>
+                                            </div>
+                                            
+                                            <input
+                                                type="range"
+                                                id="total-images"
+                                                min="1"
+                                                max="1000"
+                                                step="1"
+                                                value={totalImages}
+                                                onChange={(e) => setTotalImages(parseInt(e.target.value))}
+                                                className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-white/5 accent-primary hover:accent-primary/80 transition-all"
+                                                disabled={isAnalyzing}
+                                            />
+                                            
+                                            <div className="flex justify-between text-[9px] text-white/20 font-mono">
+                                                <span>1 IMG</span>
+                                                <span>500 IMGS</span>
+                                                <span>1K IMGS</span>
+                                            </div>
+
+                                            <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                                                <p className="text-[10px] text-text-muted leading-relaxed">
+                                                    Analysis will generate a dynamic grid covering approx. 
+                                                    <span className="text-white font-bold mx-1">
+                                                        {(totalImages * 0.003).toFixed(2)} km²
+                                                    </span> 
+                                                    around the center point.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
+
+
                     </div>
                 </div>
 

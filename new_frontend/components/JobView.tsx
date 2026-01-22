@@ -8,7 +8,7 @@ import SidebarInfo from './SidebarInfo';
 import SpacesTable from './SpacesTable';
 import AreaSelectorMap from './AreaSelectorMap';
 import { useParkingAnalysis } from '../hooks/useParkingAnalysis';
-import { getDistanceMeters, METERS_PER_MERGED_BLOCK } from '../utils/geoUtils';
+import { getDistanceMeters, METERS_PER_MERGED_BLOCK, calculateMunicipalityCoverage } from '../utils/geoUtils';
 import municipalitiesList from '../data/dutch_municipalities.json';
 
 const PREDEFINED_AREAS: Area[] = [
@@ -45,7 +45,9 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
     // State to hold fetched coordinates for municipalities
     const [dynamicBbox, setDynamicBbox] = useState<string | null>(null);
     const [municipalityPolygon, setMunicipalityPolygon] = useState<any | null>(null);
+    const [municipalityCoverage, setMunicipalityCoverage] = useState<any | null>(null);
     const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+    const [totalImages, setTotalImages] = useState<number>(9);
 
     const selectedArea = ALL_AREAS.find(a => a.id === selectedAreaId) || PREDEFINED_AREAS[0];
     
@@ -61,29 +63,43 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
         const fetchLocation = async () => {
             setIsFetchingLocation(true);
             setMunicipalityPolygon(null); // Reset polygon while loading
+            setMunicipalityCoverage(null); // Reset coverage
             
             // Only reset dynamicBbox if we are switching to a completely new fetch
-            // But if we have a predefined bbox, we might not need dynamicBbox for centering,
-            // but we still might want to fetch the polygon.
             if (area.bbox) {
                 setDynamicBbox(null);
             }
 
             try {
-                // Fetch for both dynamic and predefined to get the polygon
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(area.name)},Netherlands&format=json&limit=1&polygon_geojson=1`);
-                const data = await response.json();
+                // Step 1: Search for the exact area name
+                let response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(area.name)},Netherlands&format=json&limit=1&polygon_geojson=1`);
+                let data = await response.json();
                 
+                let foundPolygon = false;
                 if (data && data.length > 0) {
                     const { lat, lon, geojson } = data[0];
-                    
-                    // Only set dynamic bbox if the area doesn't have one hardcoded
-                    if (!area.bbox) {
-                        setDynamicBbox(`${lat},${lon}`);
-                    }
+                    if (!area.bbox) setDynamicBbox(`${lat},${lon}`);
                     
                     if (geojson && (geojson.type === 'Polygon' || geojson.type === 'MultiPolygon')) {
                         setMunicipalityPolygon(geojson);
+                        setMunicipalityCoverage(calculateMunicipalityCoverage(geojson));
+                        foundPolygon = true;
+                    }
+                }
+
+                // Step 2: Fallback - If not a polygon (e.g., a Station), try to search for the city/municipality part
+                if (!foundPolygon) {
+                    // Extract the first word or handle common cases
+                    const cityName = area.name.split(' ')[0];
+                    const fallbackResponse = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName)},Netherlands&format=json&limit=1&polygon_geojson=1&featuretype=settlement`);
+                    const fallbackData = await fallbackResponse.json();
+                    
+                    if (fallbackData && fallbackData.length > 0) {
+                        const { geojson } = fallbackData[0];
+                        if (geojson && (geojson.type === 'Polygon' || geojson.type === 'MultiPolygon')) {
+                            setMunicipalityPolygon(geojson);
+                            setMunicipalityCoverage(calculateMunicipalityCoverage(geojson));
+                        }
                     }
                 }
             } catch (error) {
@@ -158,7 +174,18 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
     }, [selectedAreaId, useCustomArea, customBounds, resetAnalysis]);
 
     const handleRunClick = () => {
-        runAnalysis(center, gridDimensions.cols, gridDimensions.rows, selectedAreaId);
+        // If using custom area, use the calculated dimensions from the map selection
+        // If using predefined point, calculate optimal grid from totalImages
+        let cols, rows;
+        if (useCustomArea) {
+            cols = gridDimensions.cols;
+            rows = gridDimensions.rows;
+        } else {
+            cols = Math.ceil(Math.sqrt(totalImages));
+            rows = Math.ceil(totalImages / cols);
+        }
+        
+        runAnalysis(center, cols, rows, selectedAreaId);
     };
 
     const handleLocateSpace = (spaceId: string) => {
@@ -213,6 +240,8 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
                 useCustomArea={useCustomArea}
                 onToggleCustomArea={handleToggleCustomArea}
                 customAreaName={customAreaName}
+                totalImages={totalImages}
+                setTotalImages={setTotalImages}
             />
 
             <ProcessingStatus
@@ -239,7 +268,11 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
                     onSpaceClick={handleLocateSpace}
                     municipalityPolygon={municipalityPolygon}
                 />
-                <SidebarInfo locationInfo={locationInfo} />
+                <SidebarInfo 
+                    locationInfo={locationInfo} 
+                    municipalityCoverage={municipalityCoverage}
+                    isFetchingLocation={isFetchingLocation}
+                />
             </div>
 
             <SpacesTable

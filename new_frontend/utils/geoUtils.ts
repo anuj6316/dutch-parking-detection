@@ -207,3 +207,58 @@ export function getMergedTileBounds(
 
     return { minLat, maxLat, minLng, maxLng };
 }
+
+/**
+ * Calculates the total number of processing blocks (1536x1536) needed to cover a municipality GeoJSON.
+ */
+export function calculateMunicipalityCoverage(geojson: any) {
+    if (!geojson) return null;
+
+    let coords: number[][] = [];
+    if (geojson.type === 'Polygon') {
+        coords = geojson.coordinates[0];
+    } else if (geojson.type === 'MultiPolygon') {
+        geojson.coordinates.forEach((poly: any) => {
+            if (poly && poly[0]) {
+                poly[0].forEach((pt: number[]) => coords.push(pt));
+            }
+        });
+    }
+
+    if (coords.length === 0) return null;
+
+    // 1. Find the absolute Bounding Box of all polygon points
+    let minLat = coords[0][1], maxLat = coords[0][1];
+    let minLng = coords[0][0], maxLng = coords[0][0];
+
+    coords.forEach(pt => {
+        const [lng, lat] = pt;
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+        minLng = Math.min(minLng, lng);
+        maxLng = Math.max(maxLng, lng);
+    });
+
+    // 2. Calculate dimensions in meters
+    const widthMeters = getDistanceMeters(minLat, minLng, minLat, maxLng);
+    const heightMeters = getDistanceMeters(minLat, minLng, maxLat, minLng);
+
+    // 3. Calculate Grid Coverage (Bounding Box)
+    // We use the STRIDE (56.16m) to calculate how many blocks would cover this rectangle
+    const cols = Math.ceil(widthMeters / METERS_PER_MERGED_BLOCK);
+    const rows = Math.ceil(heightMeters / METERS_PER_MERGED_BLOCK);
+    const totalBlocks = cols * rows;
+
+    // 4. Calculate Approximate Area (km2)
+    const areaSqKm = (widthMeters * heightMeters) / 1000000;
+
+    return {
+        cols,
+        rows,
+        totalBlocks,
+        widthKm: widthMeters / 1000,
+        heightKm: heightMeters / 1000,
+        areaSqKm,
+        bounds: { minLat, maxLat, minLng, maxLng }
+    };
+}

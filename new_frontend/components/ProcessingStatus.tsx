@@ -9,6 +9,7 @@ export type ProcessingStep = 'idle' | 'uploading' | 'preprocessing' | 'analyzing
 
 interface ProcessingStatusProps {
     status: ProcessingStep;
+    progress?: number;
     images?: string[];
     maskedImages?: Map<number, string[]>;
     statusDetails?: string;
@@ -16,7 +17,7 @@ interface ProcessingStatusProps {
     logs?: string[];
 }
 
-const ProcessingStatus: React.FC<ProcessingStatusProps> = ({ status, images = [], maskedImages, statusDetails, spaces = [], logs = [] }) => {
+const ProcessingStatus: React.FC<ProcessingStatusProps> = ({ status, progress = 0, images = [], maskedImages, statusDetails, spaces = [], logs = [] }) => {
     const [expanded, setExpanded] = useState(false);
     const [activeSection, setActiveSection] = useState<string | null>('tiles');
 
@@ -60,12 +61,12 @@ const ProcessingStatus: React.FC<ProcessingStatusProps> = ({ status, images = []
                                     </span>
                                 )}
                             </div>
-                            <span className="text-white font-mono text-sm font-bold">{status === 'completed' ? '100%' : status === 'idle' ? '0%' : '80%'}</span>
+                            <span className="text-white font-mono text-sm font-bold">{Math.round(progress)}%</span>
                         </div>
                         <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
                             <div 
-                                className={`h-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(59,130,246,0.5)] ${status === 'completed' ? 'bg-success shadow-[0_0_10px_rgba(63,185,80,0.5)]' : 'bg-primary'}`}
-                                style={{ width: status === 'completed' ? '100%' : status === 'idle' ? '0%' : '80%' }}
+                                className={`h-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(59,130,246,0.5)] ${status === 'completed' ? 'bg-success shadow-[0_0_10px_rgba(63,185,80,0.5)]' : 'bg-primary'}`}
+                                style={{ width: `${progress}%` }}
                             />
                         </div>
                         {statusDetails && <p className="text-[10px] text-text-muted italic">{statusDetails}</p>}

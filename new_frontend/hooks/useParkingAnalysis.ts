@@ -13,6 +13,7 @@ interface UseParkingAnalysisProps {
 export const useParkingAnalysis = ({ apiKey }: UseParkingAnalysisProps) => {
     const [status, setStatus] = useState<ProcessingStep>('idle');
     const [statusDetails, setStatusDetails] = useState<string>("");
+    const [progress, setProgress] = useState<number>(0);
 
     const [spaces, setSpaces] = useState<Space[]>([]);
     const [metrics, setMetrics] = useState<JobMetrics>({
@@ -29,6 +30,7 @@ export const useParkingAnalysis = ({ apiKey }: UseParkingAnalysisProps) => {
     const resetAnalysis = useCallback(() => {
         setStatus('idle');
         setStatusDetails("");
+        setProgress(0);
         setSpaces([]);
         setMetrics({ occupancyRate: 0, occupancyRateChange: 0, totalSpaces: 0, occupiedCount: 0, emptyCount: 0 });
         setLocationInfo(null);
@@ -77,11 +79,11 @@ export const useParkingAnalysis = ({ apiKey }: UseParkingAnalysisProps) => {
             console.log(`[Analysis] ${fetchStatus}`);
             setStatusDetails(fetchStatus);
 
-            console.log(`[Analysis] Sending ${fetchResult.tiles.length} merged images to API...`);
+            console.log(`[Analysis] Sending ${fetchResult.tiles.length} merged images to API (Streaming)...`);
             setLogs(prev => [...prev, `[Step 2/5] YOLO detection started`]);
             setStatusDetails(`Processing: 0%`);
 
-            const response = await fetch(API_ENDPOINTS.ANALYZE_TILES, {
+            const response = await fetch(API_ENDPOINTS.ANALYZE_TILES_STREAM, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -95,96 +97,96 @@ export const useParkingAnalysis = ({ apiKey }: UseParkingAnalysisProps) => {
                 })
             });
 
-            if (!response.ok) {
-                throw new Error(`Analysis failed: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`Analysis failed: ${response.status}`);
 
-            const analysisResult = await response.json();
-            console.log(`[Analysis] API returned ${analysisResult.detections.length} detections`);
+            // --- STREAM PROCESSING ---
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
 
-            // Add logs from backend response
-            if (analysisResult.logs && Array.isArray(analysisResult.logs)) {
-                setLogs(prev => [...prev, ...analysisResult.logs]);
-            }
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-            // Store detection masks for debugging
-            if (analysisResult.detection_masks && Array.isArray(analysisResult.detection_masks)) {
-                setDetectionMasks(analysisResult.detection_masks);
-            }
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || ''; // Keep the last partial line
 
-            setStatusDetails(`Processing: 100%`);
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const update = JSON.parse(line);
+                            
+                            if (update.type === 'log') {
+                                setLogs(prev => [...prev, update.message]);
+                            } else if (update.type === 'progress') {
+                                setProgress(update.value);
+                                setStatusDetails(`Processing: ${update.value}%`);
+                            } else if (update.type === 'final_result') {
+                                const result = update.data;
+                                console.log(`[Analysis] Received final result: ${result.detections.length} detections`);
+                                
+                                if (result.detection_masks) {
+                                    setDetectionMasks(result.detection_masks);
+                                }
 
-            const allSpaces: Space[] = analysisResult.detections.map((det: DetectionResult, idx: number) => {
-                const tileBounds = fetchResult.bounds[det.tile_index] || fetchResult.bounds[0];
+                                const allSpaces: Space[] = result.detections.map((det: DetectionResult, idx: number) => {
+                                    let geoPolygon = det.geoPolygon;
+                                    if (geoPolygon && Array.isArray(geoPolygon) && geoPolygon.length > 0) {
+                                        const first = geoPolygon[0];
+                                        const last = geoPolygon[geoPolygon.length - 1];
+                                        if (first && last && (first[0] !== last[0] || first[1] !== last[1])) {
+                                            geoPolygon = [...geoPolygon, [first[0], first[1]]];
+                                        }
+                                    }
 
-                // Validate geoPolygon
-                let geoPolygon = det.geoPolygon;
-                if (geoPolygon && Array.isArray(geoPolygon)) {
-                    // Ensure polygon is closed for Leaflet (first point = last point)
-                    if (geoPolygon.length > 0) {
-                        const first = geoPolygon[0];
-                        const last = geoPolygon[geoPolygon.length - 1];
-                        if (first && last && (first[0] !== last[0] || first[1] !== last[1])) {
-                            geoPolygon = [...geoPolygon, [first[0], first[1]]];
+                                    return {
+                                        id: `SPOT-${idx + 1}`,
+                                        status: det.is_occupied ? 'Occupied' : 'Empty',
+                                        confidence: Math.round(det.confidence[0] * 100),
+                                        vehicleCount: det.vehicle_count,
+                                        croppedImage: det.cropped_image,
+                                        croppedOverlay: det.cropped_overlay,
+                                        boundingBox: null,
+                                        tileIndex: det.tile_index,
+                                        localBoundingBox: null,
+                                        geoBoundingBox: det.geoBoundingBox,
+                                        geoPolygon: geoPolygon,
+                                        areaSqMeters: det.area_sq_meters,
+                                        estimatedCapacity: det.estimated_capacity,
+                                        dimensionsMeters: det.dimensions_meters
+                                    };
+                                });
+
+                                setSpaces(allSpaces);
+
+                                const occupiedCount = allSpaces.filter(s => s.status === 'Occupied').length;
+                                const totalVehicles = allSpaces.reduce((sum, s) => sum + (s.vehicleCount || 0), 0);
+                                const totalCapacity = allSpaces.reduce((sum, s) => sum + (s.estimatedCapacity || 1), 0);
+                                const occupancyRate = totalCapacity > 0 ? Math.round((totalVehicles / totalCapacity) * 100) : 0;
+
+                                setMetrics({
+                                    occupancyRate,
+                                    occupancyRateChange: 0,
+                                    totalSpaces: result.total_spaces,
+                                    occupiedCount,
+                                    emptyCount: result.total_spaces - occupiedCount,
+                                    totalEstimatedCapacity: result.total_spaces, // Fallback
+                                    totalVehiclesDetected: totalVehicles,
+                                    availableSpots: result.total_spaces - occupiedCount,
+                                    occupancyStatus: occupancyRate >= 90 ? 'full' : occupancyRate >= 70 ? 'busy' : occupancyRate >= 30 ? 'moderate' : 'available'
+                                });
+
+                                setStatusDetails(`Analysis complete: ${result.total_spaces} spaces, ${totalVehicles} vehicles`);
+                                setStatus('completed');
+                            }
+                        } catch (e) {
+                            console.error("Error parsing stream line:", e, line);
                         }
                     }
-                    
-                    // Log merged polygons for debugging
-                    if (geoPolygon.length > 5) {
-                        console.log(`[Frontend] Merged polygon detected: ${geoPolygon.length} points for SPOT-${idx + 1}`);
-                    }
                 }
-
-                return {
-                    id: `SPOT-${idx + 1}`,
-                    status: det.is_occupied ? 'Occupied' : 'Empty',
-                    confidence: Math.round(det.confidence[0] * 100),
-                    vehicleCount: det.vehicle_count,
-                    croppedImage: det.cropped_image,
-                    croppedOverlay: det.cropped_overlay,
-                    boundingBox: null,
-                    tileIndex: det.tile_index,
-                    localBoundingBox: null,
-                    geoBoundingBox: det.geoBoundingBox,
-                    geoPolygon: geoPolygon,
-                    areaSqMeters: det.area_sq_meters,
-                    estimatedCapacity: det.estimated_capacity,
-                    dimensionsMeters: det.dimensions_meters
-                };
-            });
-
-            setSpaces(allSpaces);
-
-            const occupiedCount = allSpaces.filter(s => s.status === 'Occupied').length;
-            const totalVehicles = allSpaces.reduce((sum, s) => sum + (s.vehicleCount || 0), 0);
-            const totalCapacity = allSpaces.reduce((sum, s) => sum + (s.estimatedCapacity || 1), 0);
-            const occupancyRate = totalCapacity > 0
-                ? Math.round((totalVehicles / totalCapacity) * 100)
-                : 0;
-
-            let statusMessage = `Analysis complete: ${analysisResult.total_spaces} spaces, ${analysisResult.total_vehicles_detected} vehicles`;
-            if (analysisResult.failed_tiles && analysisResult.failed_tiles.length > 0) {
-                statusMessage += `. ${analysisResult.failed_tiles.length} tiles failed.`;
             }
-
-            console.log(`[Analysis] ${statusMessage}`);
-            setLogs(prev => [...prev, `[Pipeline] Complete: ${analysisResult.total_spaces} total detections`]);
-
-            setMetrics({
-                occupancyRate,
-                occupancyRateChange: 0,
-                totalSpaces: analysisResult.total_spaces,
-                occupiedCount,
-                emptyCount: analysisResult.total_spaces - occupiedCount,
-                totalEstimatedCapacity: analysisResult.total_estimated_capacity,
-                totalVehiclesDetected: analysisResult.total_vehicles_detected,
-                availableSpots: analysisResult.total_estimated_capacity - analysisResult.total_vehicles_detected,
-                occupancyStatus: occupancyRate >= 90 ? 'full' : occupancyRate >= 70 ? 'busy' : occupancyRate >= 30 ? 'moderate' : 'available'
-            });
-
-            setStatusDetails(statusMessage);
-            setStatus('completed');
-
         } catch (error: any) {
             console.error("[Analysis] Error:", error);
             setLogs(prev => [...prev, `[Error] ${error.message}`]);
@@ -196,6 +198,7 @@ export const useParkingAnalysis = ({ apiKey }: UseParkingAnalysisProps) => {
     return {
         status,
         statusDetails,
+        progress,
         spaces,
         metrics,
         locationInfo,

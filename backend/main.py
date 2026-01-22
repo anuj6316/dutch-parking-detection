@@ -5,9 +5,11 @@ import logging
 import asyncio
 import os
 import base64
+import json
 from pathlib import Path
 
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from pipeline import PipelineOrchestrator
 
@@ -43,17 +45,37 @@ class TileAnalysisRequest(BaseModel):
 
 @app.post("/analyze-tiles/")
 async def analyze_tiles(request: TileAnalysisRequest):
-    """Run the complete modular detection pipeline."""
-    logger.info(f"[API] Received {len(request.tiles)} tiles")
+    """Legacy sequential endpoint (returns all at once)."""
+    logger.info(f"[API] Received {len(request.tiles)} tiles (Sequential)")
+    
+    tiles_data = [
+        {"image_base64": t.image_base64, "tile_index": t.tile_index, "bounds": t.bounds}
+        for t in request.tiles
+    ]
+    
+    final_result = {}
+    async for update in pipeline.run(tiles_data, request.confidence_threshold):
+        if update["type"] == "final_result":
+            final_result = update["data"]
+    
+    return final_result
+
+
+@app.post("/analyze-tiles-stream/")
+async def analyze_tiles_stream(request: TileAnalysisRequest):
+    """Streaming endpoint for real-time progress and logs."""
+    logger.info(f"[API] Received {len(request.tiles)} tiles (Streaming)")
 
     tiles_data = [
         {"image_base64": t.image_base64, "tile_index": t.tile_index, "bounds": t.bounds}
         for t in request.tiles
     ]
 
-    result = await pipeline.run(tiles_data, request.confidence_threshold)
+    async def event_generator():
+        async for update in pipeline.run(tiles_data, request.confidence_threshold):
+            yield json.dumps(update) + "\n"
 
-    return result
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 
 @app.get("/")

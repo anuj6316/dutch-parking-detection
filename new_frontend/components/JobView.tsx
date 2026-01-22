@@ -145,6 +145,7 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
     const {
         status,
         statusDetails,
+        progress,
         spaces,
         metrics,
         locationInfo,
@@ -246,6 +247,7 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
 
             <ProcessingStatus
                 status={status}
+                progress={progress}
                 images={tileImages}
                 maskedImages={maskedImagesMap}
                 statusDetails={statusDetails}

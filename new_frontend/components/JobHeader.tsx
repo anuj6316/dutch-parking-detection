@@ -80,16 +80,14 @@ const JobHeader: React.FC<JobHeaderProps> = ({
 
                         {!useCustomArea && (
                             <div className="relative">
-                                <div className="flex items-center gap-2 bg-[#1c2128] border border-card-border rounded-md px-1 py-1 transition-all hover:border-primary/50 min-w-[200px]">
-                                    <MapPin size={14} className="text-primary ml-2" />
-                                    <SearchableSelect
-                                        options={areas.map(a => ({ id: a.id, label: a.name }))}
-                                        value={selectedAreaId}
-                                        onChange={onAreaChange}
-                                        placeholder="Select municipality..."
-                                        className="w-full border-none"
-                                    />
-                                </div>
+                                <SearchableSelect
+                                    options={areas.map(a => ({ id: a.id, label: a.name }))}
+                                    value={selectedAreaId}
+                                    onChange={onAreaChange}
+                                    placeholder="Select municipality..."
+                                    className="bg-[#1c2128] border border-card-border rounded-lg min-w-[220px] hover:border-primary/50"
+                                    leadingIcon={<MapPin size={14} className="text-primary shrink-0" />}
+                                />
                             </div>
                         )}
 

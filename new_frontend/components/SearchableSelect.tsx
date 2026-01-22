@@ -12,6 +12,7 @@ interface SearchableSelectProps {
     onChange: (value: string) => void;
     placeholder?: string;
     className?: string;
+    leadingIcon?: React.ReactNode;
 }
 
 const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -19,7 +20,8 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     value,
     onChange,
     placeholder = "Select option...",
-    className = ""
+    className = "",
+    leadingIcon
 }) => {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState("");
@@ -42,15 +44,18 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     }, []);
 
     return (
-        <div className={`relative ${className}`} ref={wrapperRef}>
+        <div className="relative w-full" ref={wrapperRef}>
             <button
                 type="button"
                 onClick={() => setOpen(!open)}
-                className="flex items-center justify-between w-full px-3 py-2 bg-[#1c2128] border border-card-border rounded-lg text-sm text-white hover:border-primary/50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className={`flex items-center justify-between w-full px-3 py-2 text-sm text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 ${className}`}
             >
-                <span className="truncate mr-2 font-bold">
-                    {selectedOption ? selectedOption.label : placeholder}
-                </span>
+                <div className="flex items-center gap-2 truncate mr-2">
+                    {leadingIcon}
+                    <span className="truncate font-bold">
+                        {selectedOption ? selectedOption.label : placeholder}
+                    </span>
+                </div>
                 <ChevronsUpDown size={14} className="text-text-muted shrink-0" />
             </button>
 

@@ -73,6 +73,16 @@ const MapSection: React.FC<MapSectionProps> = ({
         };
     }, []);
 
+    // Update map view when center or bounds change
+    useEffect(() => {
+        if (!mapInstanceRef.current) return;
+        
+        mapInstanceRef.current.flyTo([center.lat, center.lng], 19);
+        
+        // Optionally fit bounds if they change significantly, but flyTo is usually sufficient for centering
+        // mapInstanceRef.current.fitBounds([[bounds.minLat, bounds.minLng], [bounds.maxLat, bounds.maxLng]]);
+    }, [center.lat, center.lng]);
+
     // Handle Base Layer Toggle
     useEffect(() => {
         if (!mapInstanceRef.current) return;

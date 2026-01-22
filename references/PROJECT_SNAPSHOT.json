@@ -1,7 +1,7 @@
 {
   "projectMetadata": {
     "projectName": "dutch-parking-detection",
-    "projectVersion": "1.0.6",
+    "projectVersion": "1.0.8",
     "framework": "FastAPI (Backend) / React + Vite (Frontend)",
     "language": "Python / TypeScript",
     "createdAt": "2026-01-22T00:00:00Z",
@@ -166,7 +166,7 @@
     },
     {
       "chunkId": "frontend-components",
-      "version": "1.0.6",
+      "version": "1.0.8",
       "category": "component",
       "files": [
         "new_frontend/components/AreaSelectorMap.tsx",
@@ -190,6 +190,18 @@
       },
       "lastModified": "2026-01-22T00:00:00Z",
       "changeHistory": [
+        {
+          "version": "1.0.8",
+          "date": "2026-01-22",
+          "type": "PATCH",
+          "description": "Added logic to automatically fly to the selected municipality location in MapSection."
+        },
+        {
+          "version": "1.0.7",
+          "date": "2026-01-22",
+          "type": "PATCH",
+          "description": "Cleaned up redundant styling in municipality selector and added leadingIcon support to SearchableSelect."
+        },
         {
           "version": "1.0.6",
           "date": "2026-01-22",
@@ -236,6 +248,20 @@
     }
   ],
   "globalChangeLog": [
+    {
+      "version": "1.0.8",
+      "date": "2026-01-22",
+      "type": "PATCH",
+      "description": "Automated map centering on municipality selection",
+      "chunksAffected": ["frontend-components"]
+    },
+    {
+      "version": "1.0.7",
+      "date": "2026-01-22",
+      "type": "PATCH",
+      "description": "Improved municipality selector UI styling",
+      "chunksAffected": ["frontend-components"]
+    },
     {
       "version": "1.0.6",
       "date": "2026-01-22",

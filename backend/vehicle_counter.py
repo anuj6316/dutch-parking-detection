@@ -33,7 +33,7 @@ load_dotenv(dotenv_path=env_path)
 HF_TOKEN = os.environ.get("HF_API_KEY") or os.environ.get("HF_TOKEN")
 
 # Skip SAM3 loading for faster testing - set to True to enable
-SKIP_SAM3_LOADING = False
+SKIP_SAM3_LOADING = True
 
 # Check SAM3 availability (primary - most accurate)
 SAM3_AVAILABLE = False

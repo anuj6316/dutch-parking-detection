@@ -172,7 +172,7 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="w-full max-w-5xl h-[80vh] bg-card-dark rounded-2xl border border-white/10 overflow-hidden flex flex-col shadow-2xl">
                 {/* Header */}
                 <div className="p-4 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-primary/10 to-transparent">

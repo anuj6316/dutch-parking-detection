@@ -1,0 +1,234 @@
+{
+  "projectMetadata": {
+    "projectName": "dutch-parking-detection",
+    "projectVersion": "1.0.1",
+    "framework": "FastAPI (Backend) / React + Vite (Frontend)",
+    "language": "Python / TypeScript",
+    "createdAt": "2026-01-22T00:00:00Z",
+    "lastUpdated": "2026-01-22T00:00:00Z",
+    "description": "A system to detect parking spaces and vehicles in Dutch satellite imagery using YOLO-OBB and merge them into a unified geospatial view."
+  },
+  "architecture": {
+    "pattern": "Client-Server (REST API)",
+    "entryPoints": [
+      "backend/main.py",
+      "new_frontend/index.html"
+    ],
+    "buildSystem": "Vite (Frontend)",
+    "packageManager": "npm / pip"
+  },
+  "directoryStructure": {
+    "backend/": "FastAPI server and ML pipeline",
+    "new_frontend/": "React frontend application",
+    "yolo26s-obb-heavy-aug6/": "YOLO model weights and training artifacts"
+  },
+  "chunks": [
+    {
+      "chunkId": "backend-api",
+      "version": "1.0.0",
+      "category": "service",
+      "files": [
+        "backend/main.py"
+      ],
+      "purpose": "API Entry Point",
+      "summary": "FastAPI application defining endpoints for tile analysis and image saving.",
+      "keyFunctions": [
+        "analyze_tiles(request): Orchestrates the detection pipeline",
+        "save_images(request): Saves merged images to disk"
+      ],
+      "dependencies": {
+        "imports": ["backend-pipeline"],
+        "usedBy": []
+      },
+      "lastModified": "2026-01-22T00:00:00Z",
+      "changeHistory": [
+        {
+          "version": "1.0.0",
+          "date": "2026-01-22",
+          "type": "MAJOR",
+          "description": "Initial snapshot"
+        }
+      ]
+    },
+    {
+      "chunkId": "backend-pipeline",
+      "version": "1.0.0",
+      "category": "logic",
+      "files": [
+        "backend/pipeline.py",
+        "backend/obb_merger.py"
+      ],
+      "purpose": "Detection Pipeline Orchestration",
+      "summary": "Manages the sequential execution of YOLO detection, mask generation, vehicle counting, and global geospatial merging.",
+      "keyFunctions": [
+        "PipelineOrchestrator.run(): Main execution flow",
+        "PipelineOrchestrator._merge_geo_polygons(): Merges overlapping detections across tiles",
+        "obb_merger.merge_overlapping_detections(): Merges local OBBs"
+      ],
+      "dependencies": {
+        "imports": ["backend-detection", "backend-utils"],
+        "usedBy": ["backend-api"]
+      },
+      "lastModified": "2026-01-22T00:00:00Z",
+      "changeHistory": [
+        {
+          "version": "1.0.0",
+          "date": "2026-01-22",
+          "type": "MAJOR",
+          "description": "Initial snapshot"
+        }
+      ]
+    },
+    {
+      "chunkId": "backend-detection",
+      "version": "1.0.0",
+      "category": "logic",
+      "files": [
+        "backend/yolo_detector.py",
+        "backend/vehicle_counter.py",
+        "backend/mask_generator.py"
+      ],
+      "purpose": "Core ML/CV Logic",
+      "summary": "Handles the actual inference using YOLO for parking spots and vehicle counting logic.",
+      "keyFunctions": [
+        "YOLODetector.detect_parking_spaces(): Runs YOLO inference",
+        "vehicle_counter.count_vehicles(): Counts vehicles in a spot",
+        "MaskGenerator.generate_mask(): Creates visual overlays"
+      ],
+      "dependencies": {
+        "imports": [],
+        "usedBy": ["backend-pipeline"]
+      },
+      "lastModified": "2026-01-22T00:00:00Z",
+      "changeHistory": [
+        {
+          "version": "1.0.0",
+          "date": "2026-01-22",
+          "type": "MAJOR",
+          "description": "Initial snapshot"
+        }
+      ]
+    },
+    {
+      "chunkId": "backend-utils",
+      "version": "1.0.0",
+      "category": "utility",
+      "files": [
+        "backend/capacity_estimator.py",
+        "backend/crop_utils.py",
+        "backend/source_loader.py"
+      ],
+      "purpose": "Helper Functions",
+      "summary": "Utilities for geometry, image manipulation, and data loading.",
+      "keyFunctions": [
+        "estimate_parking_capacity(): Calculates spots based on area"
+      ],
+      "dependencies": {
+        "imports": [],
+        "usedBy": ["backend-pipeline"]
+      },
+      "lastModified": "2026-01-22T00:00:00Z",
+      "changeHistory": [
+        {
+          "version": "1.0.0",
+          "date": "2026-01-22",
+          "type": "MAJOR",
+          "description": "Initial snapshot"
+        }
+      ]
+    },
+    {
+      "chunkId": "frontend-api",
+      "version": "1.0.0",
+      "category": "layer",
+      "files": [
+        "new_frontend/src/api/parkingApi.ts",
+        "new_frontend/src/api/config.ts"
+      ],
+      "purpose": "API Communication",
+      "summary": "Handles HTTP requests to the backend.",
+      "keyFunctions": [
+        "analyzeTiles(): Sends tiles for analysis"
+      ],
+      "dependencies": {
+        "imports": [],
+        "usedBy": ["frontend-components"]
+      },
+      "lastModified": "2026-01-22T00:00:00Z",
+      "changeHistory": [
+        {
+          "version": "1.0.0",
+          "date": "2026-01-22",
+          "type": "MAJOR",
+          "description": "Initial snapshot"
+        }
+      ]
+    },
+    {
+      "chunkId": "frontend-components",
+      "version": "1.0.1",
+      "category": "component",
+      "files": [
+        "new_frontend/components/AreaSelectorMap.tsx",
+        "new_frontend/components/JobView.tsx",
+        "new_frontend/components/MapSection.tsx",
+        "new_frontend/components/Dashboard.tsx"
+      ],
+      "purpose": "UI Components",
+      "summary": "React components for the application UI, including maps, dashboards, and job management.",
+      "keyFunctions": [
+        "JobView: Main container for job analysis",
+        "AreaSelectorMap: Modal for selecting analysis area",
+        "MapSection: Visualizes detections on a map"
+      ],
+      "dependencies": {
+        "imports": ["frontend-api"],
+        "usedBy": []
+      },
+      "lastModified": "2026-01-22T00:00:00Z",
+      "changeHistory": [
+        {
+          "version": "1.0.1",
+          "date": "2026-01-22",
+          "type": "PATCH",
+          "description": "Fixed z-index overlap issue in AreaSelectorMap"
+        },
+        {
+          "version": "1.0.0",
+          "date": "2026-01-22",
+          "type": "MAJOR",
+          "description": "Initial snapshot"
+        }
+      ]
+    }
+  ],
+  "globalChangeLog": [
+    {
+      "version": "1.0.1",
+      "date": "2026-01-22",
+      "type": "PATCH",
+      "description": "Fixed UI overlap issue in AreaSelectorMap",
+      "chunksAffected": ["frontend-components"]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-01-22",
+      "type": "MAJOR",
+      "description": "Initial snapshot created"
+    }
+  ],
+  "apiEndpoints": [
+    {
+      "path": "/analyze-tiles/",
+      "method": "POST",
+      "handler": "backend-api",
+      "purpose": "Process image tiles for parking detection"
+    },
+    {
+      "path": "/save-images/",
+      "method": "POST",
+      "handler": "backend-api",
+      "purpose": "Save processed images"
+    }
+  ]
+}

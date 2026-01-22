@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class YOLODetector:
     def __init__(
         self,
-        model_path: str = "/home/mindmap/Documents/dutch-parking-detection/utrecht_center_model/transfer-learning-obb-strong-aug3/weights/best.pt",
+        model_path: str = "/home/anuj/Documents/dutch-parking-detection/yolo26s-obb-heavy-aug6/weights/best.pt",
     ):
         self.model = YOLO(model_path)
         logger.info(f"[YOLO] Loaded model from {model_path}")

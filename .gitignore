@@ -14,3 +14,15 @@ Merge branch 'fix-progress-percentage'
 
 runs/
 runs/*
+
+off_experiments/
+off_experiments/*
+
+utrecht_center_model/
+utrecht_center_model/*
+
+yolo26l-obb/
+yolo26l-obb/*
+
+yolol-obb/
+yolol-obb/*

@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from PIL import Image, ImageDraw
 import numpy as np
-from config import MODEL_PATH, SKIP_SAM3_MODEL
+# from config import MODEL_PATH, SKIP_SAM3_MODEL
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -34,7 +34,7 @@ load_dotenv(dotenv_path=env_path)
 HF_TOKEN = os.environ.get("HF_API_KEY") or os.environ.get("HF_TOKEN")
 
 # Skip SAM3 loading for faster testing - set to True to enable
-SKIP_SAM3_LOADING = SKIP_SAM3_LOADING
+SKIP_SAM3_LOADING = True
 
 # Check SAM3 availability (primary - most accurate)
 SAM3_AVAILABLE = False
@@ -168,7 +168,7 @@ class VehicleCounter:
         if not SAM3_AVAILABLE and not COLAB_AVAILABLE and YOLO_AVAILABLE:
             try:
                 logger.info("[VehicleCounter] Loading YOLOv8n as fallback...")
-                self.yolo_model = YOLO("/home/anuj/Downloads/dutch-parking-detection/extra/models/yolov8n.pt")
+                self.yolo_model = YOLO("/home/mindmap/Desktop/dutch-parking-detection/yolo26n.pt")
                 logger.info("[VehicleCounter] YOLOv8n fallback loaded!")
             except Exception as e:
                 logger.error(f"[VehicleCounter] Error loading YOLO fallback: {e}")

@@ -1,7 +1,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { MapPin, Check, X, Move, ZoomIn, ZoomOut } from 'lucide-react';
+import { MapPin, Check, X, Move, ZoomIn, ZoomOut, Link as LinkIcon } from 'lucide-react';
+import { parseGoogleMapsUrl } from '../utils/geoUtils';
 
 interface AreaSelectorMapProps {
     onAreaSelected: (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => void;
@@ -33,6 +34,7 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
         lat: initialCenter.lat.toFixed(5), 
         lng: initialCenter.lng.toFixed(5) 
     });
+    const [googleMapsUrl, setGoogleMapsUrl] = useState('');
     const [locationName, setLocationName] = useState<string | null>(null);
 
     const fetchLocationName = async (lat: number, lng: number) => {
@@ -99,6 +101,26 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
                 mapInstanceRef.current.flyTo([lat, lng], 17);
             }
             fetchLocationName(lat, lng);
+        }
+    };
+
+    const handleGoogleUrlSubmit = (url: string) => {
+        console.log("handleGoogleUrlSubmit triggered with:", url);
+        const coords = parseGoogleMapsUrl(url);
+        if (coords) {
+            console.log("Extracted coords:", coords);
+            const newBounds = calculateBoundsFromCenter(coords.lat, coords.lng);
+            updateRectangle(newBounds);
+            if (mapInstanceRef.current) {
+                console.log("Flying map to:", [coords.lat, coords.lng]);
+                mapInstanceRef.current.flyTo([coords.lat, coords.lng], 17);
+            } else {
+                console.error("mapInstanceRef.current is null!");
+            }
+            fetchLocationName(coords.lat, coords.lng);
+            setGoogleMapsUrl(''); // Clear after success
+        } else {
+            console.warn("Could not parse coordinates from URL");
         }
     };
 
@@ -247,7 +269,36 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center bg-black/40 rounded-lg p-1 border border-white/10 group focus-within:border-primary/50 transition-colors">
+                            <div className="pl-2 pr-1 text-text-muted">
+                                <LinkIcon size={14} />
+                            </div>
+                            <input 
+                                type="text" 
+                                value={googleMapsUrl}
+                                onChange={(e) => {
+                                    setGoogleMapsUrl(e.target.value);
+                                    // Only try to parse if it looks like a full URL or contains coordinates
+                                    if (e.target.value.includes('google.com/maps') || e.target.value.includes('@')) {
+                                        handleGoogleUrlSubmit(e.target.value);
+                                    }
+                                }}
+                                onPaste={(e) => {
+                                    const pastedText = e.clipboardData.getData('text');
+                                    console.log("Pasted text:", pastedText);
+                                    handleGoogleUrlSubmit(pastedText);
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleGoogleUrlSubmit(googleMapsUrl);
+                                    }
+                                }}
+                                placeholder="Paste Google Maps Link"
+                                className="bg-transparent border-none w-48 text-xs text-white focus:ring-0 placeholder:text-text-muted/50"
+                            />
+                        </div>
+
                         <div className="flex items-center bg-black/40 rounded-lg p-1 border border-white/10">
                             <input 
                                 type="text" 

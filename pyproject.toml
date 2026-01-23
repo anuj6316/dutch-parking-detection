@@ -32,6 +32,7 @@ frontend = { shell = "npm run dev", cwd = "./frontend" }
 new_frontend = { shell = "npm run dev", cwd = "./new_frontend" }
 dev = { parallel = ["backend", "frontend"] }
 new_dev = { parallel = ["backend", "new_frontend"] }
+pred = { shell = "python prediction_script.py", cwd = "/home/mindmap/Desktop/dutch-parking-detection/experiments"}
 
 [tool.uv.sources]
 transformers = { git = "https://github.com/huggingface/transformers.git" }

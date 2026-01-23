@@ -262,3 +262,55 @@ export function calculateMunicipalityCoverage(geojson: any) {
         bounds: { minLat, maxLat, minLng, maxLng }
     };
 }
+
+/**
+ * Extracts latitude and longitude from a Google Maps URL.
+ * Supports:
+ * - https://www.google.com/maps/@lat,lng,zoomz
+ * - https://www.google.com/maps/search/?api=1&query=lat,lng
+ * - https://www.google.com/maps/place/Name/@lat,lng,zoomz
+ */
+export function parseGoogleMapsUrl(url: string): { lat: number; lng: number } | null {
+    console.log("Parsing URL:", url);
+    try {
+        // Handle @lat,lng format (more robust regex for coordinates)
+        const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+        if (atMatch) {
+            console.log("Matched @lat,lng:", atMatch[1], atMatch[2]);
+            return {
+                lat: parseFloat(atMatch[1]),
+                lng: parseFloat(atMatch[2])
+            };
+        }
+
+        // Handle URLs with search/place/dir etc. that have coordinates in path but not @
+        // e.g. /maps/dir/52.15,5.37/...
+        const pathMatch = url.match(/\/maps\/(?:dir|search|place)\/(-?\d+\.\d+),(-?\d+\.\d+)/);
+        if (pathMatch) {
+            console.log("Matched path lat,lng:", pathMatch[1], pathMatch[2]);
+            return {
+                lat: parseFloat(pathMatch[1]),
+                lng: parseFloat(pathMatch[2])
+            };
+        }
+
+        // Handle query=lat,lng format
+        const queryMatch = url.match(/[?&](?:query|q)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+        if (queryMatch) {
+            console.log("Matched query/q=lat,lng:", queryMatch[1], queryMatch[2]);
+            return {
+                lat: parseFloat(queryMatch[1]),
+                lng: parseFloat(queryMatch[2])
+            };
+        }
+
+        // Handle shortened youtu.be style or other redirects if they contain coords in the resolved string
+        // Note: Real redirects would need a fetch, but often coords are in the initial URL too.
+
+        console.warn("No coordinate match found in URL");
+        return null;
+    } catch (e) {
+        console.error("Error parsing Google Maps URL:", e);
+        return null;
+    }
+}

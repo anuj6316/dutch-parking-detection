@@ -20,10 +20,11 @@ class YOLODetector:
         """Detect parking spaces using YOLO with explicit .predict() pattern."""
         results = self.model.predict(
             source=image,
-            imgsz=640,
+            imgsz=1024,
             conf=confidence,
             verbose=False,
             save=False,
+            device="cpu"
         )
 
         logger.info(f"[YOLO] Results type: {type(results)}, length: {len(results)}")

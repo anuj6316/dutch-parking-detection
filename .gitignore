@@ -26,3 +26,8 @@ yolo26l-obb/*
 
 yolol-obb/
 yolol-obb/*
+
+models/
+models/*
+
+*.pt

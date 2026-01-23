@@ -1,60 +1,192 @@
 {
   "projectMetadata": {
     "projectName": "dutch-parking-detection",
-    "projectVersion": "1.5.0",
+    "projectVersion": "2.1.0",
     "framework": "FastAPI (Backend) / React + Vite (Frontend)",
     "language": "Python / TypeScript",
     "createdAt": "2026-01-22T00:00:00Z",
-    "lastUpdated": "2026-01-22T00:00:00Z",
-    "description": "A system to detect parking spaces and vehicles in Dutch satellite imagery using YOLO-OBB and merge them into a unified geospatial view."
+    "lastUpdated": "2026-01-23T00:00:00Z",
+    "description": "A comprehensive system for detecting parking spaces and vehicles in Dutch satellite imagery using YOLO-OBB, merging detections across tiles, and verifying results with VLM. Features a React-based frontend for interactive area selection and real-time analysis visualization."
   },
   "architecture": {
-    "pattern": "Client-Server (REST API)",
+    "pattern": "Client-Server (REST API with Streaming Support)",
     "entryPoints": [
       "backend/main.py",
       "new_frontend/index.html"
     ],
-    "buildSystem": "Vite (Frontend)",
-    "packageManager": "npm / pip"
+    "buildSystem": "Vite (Frontend), UV/Pip (Backend)",
+    "packageManager": "npm / uv"
   },
   "directoryStructure": {
-    "backend/": "FastAPI server and ML pipeline",
-    "new_frontend/": "React frontend application",
-    "yolo26s-obb-heavy-aug6/": "YOLO model weights and training artifacts"
+    "backend/": "FastAPI server, ML pipeline orchestrator, and detection logic",
+    "new_frontend/": "React frontend application for map interaction and results display",
+    "experiments/": "Scripts for testing and evaluating model performance",
+    "yolo26s-obb-heavy-aug6/": "Current production-ready YOLO-OBB model weights",
+    "references/": "Project documentation and snapshots"
   },
   "chunks": [
     {
-      "chunkId": "frontend-components",
-      "version": "1.5.0",
+      "chunkId": "backend-core",
+      "version": "1.0.0",
+      "category": "core",
+      "files": [
+        "backend/main.py",
+        "backend/pipeline.py",
+        "backend/config.py"
+      ],
+      "purpose": "API Entry point and Pipeline Orchestration",
+      "summary": "FastAPI server providing endpoints for tile analysis (streaming and sequential). PipelineOrchestrator manages the end-to-end flow from tile detection to global polygon merging.",
+      "keyFunctions": [
+        "analyze_tiles_stream: Endpoint for real-time progress updates",
+        "PipelineOrchestrator.run: Orchestrates detection, merging, and counting",
+        "_merge_geo_polygons: Merges overlapping detections across tile boundaries using Shapely"
+      ],
+      "dependencies": {
+        "imports": ["yolo-detector", "obb-merger", "vehicle-counter", "vlm-verifier"],
+        "usedBy": ["frontend-api"]
+      },
+      "lastModified": "2026-01-23T00:00:00Z"
+    },
+    {
+      "chunkId": "backend-ml-detection",
+      "version": "1.0.0",
+      "category": "ml",
+      "files": [
+        "backend/yolo_detector.py",
+        "backend/obb_merger.py",
+        "backend/vehicle_counter.py"
+      ],
+      "purpose": "Core Object Detection and Geometric Merging",
+      "summary": "Handles YOLO-OBB model inference for parking spaces and vehicles. Includes logic for merging oriented bounding boxes (OBB) and counting vehicles within parking areas.",
+      "keyFunctions": [
+        "YOLODetector.detect: Runs OBB inference on image tiles",
+        "obb_merger: Merges detections within a single tile using IOU",
+        "vehicle_counter: Matches vehicles to parking spaces using point-in-polygon"
+      ],
+      "lastModified": "2026-01-23T00:00:00Z"
+    },
+    {
+      "chunkId": "backend-ml-verification",
+      "version": "1.0.0",
+      "category": "ml",
+      "files": [
+        "backend/vlm_verifier.py",
+        "backend/capacity_estimator.py"
+      ],
+      "purpose": "Result Verification and Capacity Refinement",
+      "summary": "Uses Vision-Language Models (VLM) to verify suspicious or ambiguous detections. Estimates total parking capacity based on detected area and typical vehicle dimensions.",
+      "keyFunctions": [
+        "VLMVerifier.verify: Uses Google GenAI (Gemini) to validate detections",
+        "estimate_parking_capacity: Calculates theoretical max capacity for large areas"
+      ],
+      "lastModified": "2026-01-23T00:00:00Z"
+    },
+    {
+      "chunkId": "frontend-core",
+      "version": "1.0.0",
+      "category": "core",
+      "files": [
+        "new_frontend/App.tsx",
+        "new_frontend/index.tsx",
+        "new_frontend/types.ts"
+      ],
+      "purpose": "Frontend Application Shell",
+      "summary": "Main entry point and global type definitions for the React application. Sets up routing and global providers.",
+      "lastModified": "2026-01-23T00:00:00Z"
+    },
+    {
+      "chunkId": "frontend-maps",
+      "version": "1.1.0",
+      "category": "component",
+      "files": [
+        "new_frontend/components/AreaSelectorMap.tsx",
+        "new_frontend/components/MapSection.tsx"
+      ],
+      "purpose": "Geospatial Interaction",
+      "summary": "Leaflet-based components for selecting areas of interest. AreaSelectorMap now supports direct positioning via Google Maps link extraction.",
+      "keyFunctions": [
+        "AreaSelectorMap: Interface for drawing polygons and selecting municipalities; includes Google Maps URL parser integration",
+        "MapSection: Displays merged images and detection results on the map"
+      ],
+      "lastModified": "2026-01-23T00:00:00Z"
+    },
+    {
+      "chunkId": "frontend-job-analysis",
+      "version": "1.1.0",
       "category": "component",
       "files": [
         "new_frontend/components/JobHeader.tsx",
-        "new_frontend/components/JobView.tsx"
+        "new_frontend/components/JobView.tsx",
+        "new_frontend/components/ProcessingStatus.tsx"
       ],
-      "purpose": "UI Components",
-      "summary": "React components for the application UI, including maps, dashboards, and job management.",
+      "purpose": "Analysis Workflow Management",
+      "summary": "Manages the execution and monitoring of parking detection jobs. Includes controls for analysis extent and real-time status updates.",
       "keyFunctions": [
-        "JobHeader: Simplified header with single 'Total Images' input",
-        "JobView: Main container with intelligent image-to-grid mapping"
+        "JobHeader: UI for initiating analysis with simplified 'Total Images' control",
+        "JobView: Orchestrates the tile analysis flow and manages progress state",
+        "ProcessingStatus: Visual indicator of current backend activity and logs"
       ],
-      "lastModified": "2026-01-22T00:00:00Z",
-      "changeHistory": [
-        {
-          "version": "1.5.0",
-          "date": "2026-01-22",
-          "type": "MINOR",
-          "description": "Simplified Advanced Settings by replacing complex NxM grid controls with a single 'Total Images to Process' input and slider."
-        }
-      ]
+      "lastModified": "2026-01-22T00:00:00Z"
+    },
+    {
+      "chunkId": "frontend-hooks-api",
+      "version": "1.0.0",
+      "category": "service",
+      "files": [
+        "new_frontend/hooks/useParkingAnalysis.ts",
+        "new_frontend/src/api/parkingApi.ts",
+        "new_frontend/src/api/config.ts",
+        "new_frontend/src/context/ApiContext.tsx"
+      ],
+      "purpose": "State Management and API Communication",
+      "summary": "Custom hooks and API clients for interacting with the FastAPI backend. Handles streaming responses and global application state via context.",
+      "lastModified": "2026-01-23T00:00:00Z"
+    },
+    {
+      "chunkId": "frontend-utils",
+      "version": "1.1.0",
+      "category": "utility",
+      "files": [
+        "new_frontend/utils/geoUtils.ts",
+        "new_frontend/utils/pathUtils.ts",
+        "new_frontend/utils/fileUtils.ts",
+        "new_frontend/utils/imageUtils.ts"
+      ],
+      "purpose": "Frontend Helper Functions",
+      "summary": "Utility functions for geospatial calculations, image processing, and Google Maps URL coordinate extraction.",
+      "keyFunctions": [
+        "parseGoogleMapsUrl: Extracts lat/lng from various Google Maps link formats"
+      ],
+      "lastModified": "2026-01-23T00:00:00Z"
     }
   ],
   "globalChangeLog": [
+    {
+      "version": "2.1.0",
+      "date": "2026-01-23",
+      "type": "MINOR",
+      "description": "Added Google Maps link coordinate extraction for automated area selection.",
+      "chunksAffected": ["frontend-maps", "frontend-utils"]
+    },
+    {
+      "version": "2.0.0",
+      "date": "2026-01-23",
+      "type": "MAJOR",
+      "description": "Comprehensive snapshot regeneration to reflect the complete project architecture across backend and frontend.",
+      "chunksAffected": []
+    },
     {
       "version": "1.5.0",
       "date": "2026-01-22",
       "type": "MINOR",
       "description": "Simplified analysis extent controls to use a single 'Total Images' metric",
-      "chunksAffected": ["frontend-components"]
+      "chunksAffected": ["frontend-job-analysis"]
     }
-  ]
+  ],
+  "crossCuttingConcerns": {
+    "errorHandling": "Standardized logging in backend; Toast notifications/Status bars in frontend.",
+    "stateManagement": "React Context (ApiContext) and custom hooks (useParkingAnalysis).",
+    "geospatial": "EPSG:3857 (Web Mercator) used for tiling; Leaflet for visualization.",
+    "ml": "YOLO11-OBB for detection; Gemini for VLM verification."
+  }
 }

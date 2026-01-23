@@ -116,10 +116,34 @@ const SpacesTable: React.FC<SpacesTableProps> = ({ spaces, onLocateSpace, active
                                         <button 
                                             onClick={() => onLocateSpace?.(space.id)}
                                             className={`p-2 rounded-md transition-all ${activeSpaceId === space.id ? 'bg-primary text-white' : 'text-text-muted hover:text-white hover:bg-[#1c2128]'}`}
+                                            title="Locate on Analysis Map"
                                         >
                                             <MapPin size={14} />
                                         </button>
-                                        <button className="p-2 text-text-muted hover:text-white hover:bg-[#1c2128] rounded-md transition-all">
+                                        <button 
+                                            onClick={() => {
+                                                // Calculate center from geoPolygon or geoBoundingBox
+                                                let lat, lng;
+                                                if (space.geoPolygon && space.geoPolygon.length > 0) {
+                                                    const lats = space.geoPolygon.map(p => p[0]);
+                                                    const lngs = space.geoPolygon.map(p => p[1]);
+                                                    lat = (Math.min(...lats) + Math.max(...lats)) / 2;
+                                                    lng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+                                                } else if (space.geoBoundingBox) {
+                                                    lat = (space.geoBoundingBox[0] + space.geoBoundingBox[2]) / 2;
+                                                    lng = (space.geoBoundingBox[1] + space.geoBoundingBox[3]) / 2;
+                                                }
+
+                                                if (lat && lng) {
+                                                    const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                                                    window.open(url, '_blank');
+                                                } else {
+                                                    alert("Geospatial coordinates not available for this space.");
+                                                }
+                                            }}
+                                            className="p-2 text-text-muted hover:text-white hover:bg-[#1c2128] rounded-md transition-all"
+                                            title="Open in Google Maps"
+                                        >
                                             <ExternalLink size={14} />
                                         </button>
                                     </div>

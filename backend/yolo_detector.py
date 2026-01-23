@@ -2,14 +2,14 @@ from ultralytics import YOLO
 import logging
 from PIL import Image
 from typing import List, Dict, Any
-
+from config import MODEL_PATH
 logger = logging.getLogger(__name__)
 
 
 class YOLODetector:
     def __init__(
         self,
-        model_path: str = "/home/anuj/Documents/dutch-parking-detection/yolo26s-obb-heavy-aug6/weights/best.pt",
+        model_path: str = MODEL_PATH,
     ):
         self.model = YOLO(model_path)
         logger.info(f"[YOLO] Loaded model from {model_path}")

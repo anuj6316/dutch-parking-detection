@@ -4,6 +4,9 @@ import { LocationInfo } from '../types';
 
 interface SidebarInfoProps {
     locationInfo?: LocationInfo | null;
+    totalImages: number;
+    gridCols: number;
+    gridRows: number;
     municipalityCoverage?: {
         totalBlocks: number;
         areaSqKm: number;
@@ -15,13 +18,57 @@ interface SidebarInfoProps {
     isFetchingLocation?: boolean;
 }
 
-const SidebarInfo: React.FC<SidebarInfoProps> = ({ locationInfo, municipalityCoverage, isFetchingLocation }) => {
+const SidebarInfo: React.FC<SidebarInfoProps> = ({ 
+    locationInfo, 
+    totalImages, 
+    gridCols, 
+    gridRows, 
+    municipalityCoverage, 
+    isFetchingLocation 
+}) => {
     const handleDownload = (format: string) => {
         alert(`Downloading ${format} export...`);
     };
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="lg:col-span-1 w-full flex flex-col gap-6">
+            {/* Active Job Scale */}
+            <div className="rounded-xl bg-card-dark border border-white/10 p-6 flex flex-col gap-4">
+                <div className="flex items-center gap-2">
+                    <LayoutGrid size={20} className="text-primary" />
+                    <h3 className="text-white font-bold text-lg">Job Scale</h3>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest flex items-center gap-1">
+                            Current Images
+                        </span>
+                        <span className="text-white text-xl font-black font-mono">
+                            {totalImages}
+                        </span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest flex items-center gap-1">
+                            Grid Size
+                        </span>
+                        <span className="text-white text-xl font-black font-mono">
+                            {gridCols} × {gridRows}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-2 mt-2 pt-4 border-t border-white/5">
+                    <div className="flex justify-between items-center text-xs">
+                        <span className="text-text-muted">Coverage Area</span>
+                        <span className="text-white font-medium">~{(totalImages * 0.003).toFixed(3)} km²</span>
+                    </div>
+                    <p className="text-[9px] text-text-muted mt-1">
+                        This reflects the actual area selected for processing in the current job.
+                    </p>
+                </div>
+            </div>
+
             {/* Municipal Scale Intelligence */}
             {isFetchingLocation ? (
                 <div className="rounded-xl bg-card-dark border border-white/5 p-6 flex flex-col items-center justify-center gap-3 min-h-[160px]">

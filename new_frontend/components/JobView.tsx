@@ -169,6 +169,13 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
         return map;
     }, [detectionMasks]);
 
+    // Sync totalImages with calculated grid when using custom area
+    useEffect(() => {
+        if (useCustomArea) {
+            setTotalImages(gridDimensions.cols * gridDimensions.rows);
+        }
+    }, [useCustomArea, gridDimensions]);
+
     useEffect(() => {
         resetAnalysis();
         setActiveSpaceId(null);
@@ -272,6 +279,9 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
                 />
                 <SidebarInfo 
                     locationInfo={locationInfo} 
+                    totalImages={totalImages}
+                    gridCols={useCustomArea ? gridDimensions.cols : Math.ceil(Math.sqrt(totalImages))}
+                    gridRows={useCustomArea ? gridDimensions.rows : Math.ceil(totalImages / Math.ceil(Math.sqrt(totalImages)))}
                     municipalityCoverage={municipalityCoverage}
                     isFetchingLocation={isFetchingLocation}
                 />

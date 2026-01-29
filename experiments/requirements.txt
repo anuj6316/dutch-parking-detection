@@ -1,0 +1,22 @@
+# Requirements for Kimi-VL-A3B-Thinking-2506 Parallel Processing
+# Install in this order to avoid build issues
+
+# Core dependencies (install these first)
+torch>=2.1.0
+transformers==4.51.3
+accelerate>=0.20.0
+bitsandbytes>=0.41.0
+Pillow>=9.0.0
+tqdm>=4.65.0
+
+# Note: flash-attn is OPTIONAL but recommended for better performance
+# Install it separately AFTER the above packages:
+# pip install flash-attn --no-build-isolation
+# 
+# Or with uv:
+# uv pip install flash-attn --no-build-isolation
+#
+# If flash-attn installation fails, the script will still work (just slightly slower)
+
+# For production use with long context (32K tokens), consider:
+# vllm==0.9.1

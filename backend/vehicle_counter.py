@@ -33,8 +33,20 @@ load_dotenv(dotenv_path=env_path)
 # Get HuggingFace token for gated models
 HF_TOKEN = os.environ.get("HF_API_KEY") or os.environ.get("HF_TOKEN")
 
+# Logging into the HF account
+try:
+    from huggingface_hub import login
+    login(token=HF_TOKEN)
+    logging.info("HuggingFace Login Was Success")
+except Exception as e:
+    logging.error(f"Encountered Some Error During the HF login: {e}")
+
 # Skip SAM3 loading for faster testing - set to True to enable
-SKIP_SAM3_LOADING = True
+try:
+    SKIP_SAM3_LOADING = os.environ.get("SKIP_SAM3_LOADING")
+except Exception as e:
+    logging.error(f"SKIP_SAM3_LOADING is encounter some error {e}")
+    
 
 # Check SAM3 availability (primary - most accurate)
 SAM3_AVAILABLE = False

@@ -183,9 +183,11 @@ class VehicleCounter:
         """Initialize fallback YOLO model if needed."""
         if not SAM3_AVAILABLE and not COLAB_AVAILABLE and YOLO_AVAILABLE:
             try:
-                logger.info("[VehicleCounter] Loading YOLOv8n as fallback...")
-                self.yolo_model = YOLO("/home/mindmap/Desktop/dutch-parking-detection/yolo26n.pt")
-                logger.info("[VehicleCounter] YOLOv8n fallback loaded!")
+                # Use environment variable or relative path for the fallback model
+                fallback_model_path = os.getenv("YOLO_FALLBACK_MODEL", "../yolo26n.pt")
+                logger.info(f"[VehicleCounter] Loading YOLO fallback from {fallback_model_path}...")
+                self.yolo_model = YOLO(fallback_model_path)
+                logger.info("[VehicleCounter] YOLO fallback loaded!")
             except Exception as e:
                 logger.error(f"[VehicleCounter] Error loading YOLO fallback: {e}")
 

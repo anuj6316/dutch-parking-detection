@@ -11,6 +11,9 @@ from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from pipeline import PipelineOrchestrator
 
 logging.basicConfig(
@@ -20,9 +23,11 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o.strip() for o in origins if o],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

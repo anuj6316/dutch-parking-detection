@@ -24,6 +24,9 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
+logging.info(f"Allowed Origins List: {origins}")
+if not origins or origins == [""]:
+    raise RuntimeError("ALLOWED_ORIGINS is not set correctly")
 
 app.add_middleware(
     CORSMiddleware,
@@ -80,7 +83,15 @@ async def analyze_tiles_stream(request: TileAnalysisRequest):
         async for update in pipeline.run(tiles_data, request.confidence_threshold):
             yield json.dumps(update) + "\n"
 
-    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+    return StreamingResponse(
+        event_generator(),
+        media_type="application/x-ndjson",
+        headers={
+            "Access-Control-Allow-Origin": ",".join(origins),
+            "Access-Control-Allow-Credentials": "true",
+            "Cache-Control": "no-cache",
+        },
+    )
 
 
 @app.get("/")

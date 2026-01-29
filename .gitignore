@@ -31,3 +31,5 @@ models/
 models/*
 
 *.pt
+.env
+experiments/TEST_K3-a-2.pdf

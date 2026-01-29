@@ -160,15 +160,18 @@ const JobHeader: React.FC<JobHeaderProps> = ({
                                             <div className="flex justify-between items-center">
                                                 <div className="flex flex-col gap-0.5">
                                                     <label htmlFor="total-images" className="text-text-muted text-xs font-medium uppercase tracking-wider">Analysis Scale</label>
-                                                    <span className="text-[9px] text-primary/60 font-medium">Number of images to process</span>
+                                                    <span className="text-[9px] text-primary/60 font-medium">
+                                                        {useCustomArea ? "Auto-calculated from area" : "Number of images to process"}
+                                                    </span>
                                                 </div>
-                                                <div className="flex items-center bg-black/40 border border-white/10 rounded-lg p-1 group-focus-within:border-primary/50 transition-all">
+                                                <div className={`flex items-center bg-black/40 border border-white/10 rounded-lg p-1 group-focus-within:border-primary/50 transition-all ${useCustomArea ? 'opacity-50' : ''}`}>
                                                     <input 
                                                         type="number"
                                                         id="total-images-input"
                                                         value={totalImages}
                                                         onChange={(e) => setTotalImages(Math.max(1, Math.min(1000, parseInt(e.target.value) || 1)))}
                                                         className="w-16 bg-transparent border-none text-xs text-white text-center focus:ring-0 py-0.5 font-mono font-bold"
+                                                        disabled={isAnalyzing || useCustomArea}
                                                     />
                                                 </div>
                                             </div>
@@ -181,8 +184,8 @@ const JobHeader: React.FC<JobHeaderProps> = ({
                                                 step="1"
                                                 value={totalImages}
                                                 onChange={(e) => setTotalImages(parseInt(e.target.value))}
-                                                className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-white/5 accent-primary hover:accent-primary/80 transition-all"
-                                                disabled={isAnalyzing}
+                                                className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-white/5 accent-primary hover:accent-primary/80 transition-all ${useCustomArea ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                disabled={isAnalyzing || useCustomArea}
                                             />
                                             
                                             <div className="flex justify-between text-[9px] text-white/20 font-mono">

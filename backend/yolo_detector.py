@@ -2,9 +2,17 @@ from ultralytics import YOLO
 import logging
 from PIL import Image
 from typing import List, Dict, Any
-from config import MODEL_PATH
+# from config import MODEL_PATH
 logger = logging.getLogger(__name__)
 
+from dotenv import load_dotenv
+load_dotenv()
+
+try:
+    MODEL_PATH = os.getenv("MODEL_PATH")
+    logging.info("Model Path loaded successfully.")
+except:
+    logging.warning("Model Path Not Loaded.")
 
 class YOLODetector:
     def __init__(

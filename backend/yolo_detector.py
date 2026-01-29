@@ -1,18 +1,19 @@
-from ultralytics import YOLO
+import os
 import logging
+from ultralytics import YOLO
 from PIL import Image
 from typing import List, Dict, Any
-# from config import MODEL_PATH
-logger = logging.getLogger(__name__)
-
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 load_dotenv()
 
-try:
-    MODEL_PATH = os.getenv("MODEL_PATH")
-    logging.info("Model Path loaded successfully.")
-except:
-    logging.warning("Model Path Not Loaded.")
+MODEL_PATH = os.getenv("MODEL_PATH")
+if not MODEL_PATH:
+    MODEL_PATH = "/app/yolo26s-obb-heavy-aug6/weights/best.pt"
+    logger.info(f"Using default Model Path: {MODEL_PATH}")
+else:
+    logger.info(f"Model Path loaded from environment: {MODEL_PATH}")
 
 class YOLODetector:
     def __init__(

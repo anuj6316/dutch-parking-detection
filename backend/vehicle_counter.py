@@ -55,6 +55,7 @@ except Exception as e:
 SAM3_AVAILABLE = False
 sam3_model = None
 sam3_processor = None
+device = "cpu"
 
 if not SKIP_SAM3_LOADING:
     try:

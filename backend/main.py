@@ -23,14 +23,18 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
-logging.info(f"Allowed Origins List: {origins}")
-if not origins or origins == [""]:
-    raise RuntimeError("ALLOWED_ORIGINS is not set correctly")
+raw_origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
+origins = []
+for o in raw_origins:
+    o = o.strip().rstrip("/")
+    if o:
+        origins.append(o)
+        # Also allow the origin with a trailing slash just in case
+        origins.append(o + "/")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in origins if o],
+    allow_origins=origins if origins else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

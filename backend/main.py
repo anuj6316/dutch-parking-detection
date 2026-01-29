@@ -84,17 +84,19 @@ async def analyze_tiles_stream(request: TileAnalysisRequest):
     ]
 
     async def event_generator():
-        async for update in pipeline.run(tiles_data, request.confidence_threshold):
-            yield json.dumps(update) + "\n"
+        # Yield an initial message to immediately open the connection and send headers
+        yield json.dumps({"type": "log", "message": "Connection established. Starting analysis..."}) + "\n"
+        
+        try:
+            async for update in pipeline.run(tiles_data, request.confidence_threshold):
+                yield json.dumps(update) + "\n"
+        except Exception as e:
+            logger.error(f"Error in event_generator: {e}")
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
 
     return StreamingResponse(
         event_generator(),
-        media_type="application/x-ndjson",
-        headers={
-            "Access-Control-Allow-Origin": ",".join(origins),
-            "Access-Control-Allow-Credentials": "true",
-            "Cache-Control": "no-cache",
-        },
+        media_type="application/x-ndjson"
     )
 
 

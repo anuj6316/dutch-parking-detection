@@ -35,15 +35,18 @@ HF_TOKEN = os.environ.get("HF_API_KEY") or os.environ.get("HF_TOKEN")
 
 # Logging into the HF account
 try:
-    from huggingface_hub import login
-    login(token=HF_TOKEN)
-    logging.info("HuggingFace Login Was Success")
+    from huggingface_hub import login, whoami
+    login(token=HF_TOKEN, add_to_git_credential=False)
+    # logging.info("HuggingFace login successful")
+    user = whoami()
+    logging.info(f"Logged into HuggingFace as: {user['name']}")
 except Exception as e:
-    logging.error(f"Encountered Some Error During the HF login: {e}")
+    logging.exception(f"Error during HuggingFace login: {e}")
 
 # Skip SAM3 loading for faster testing - set to True to enable
 try:
     SKIP_SAM3_LOADING = os.environ.get("SKIP_SAM3_LOADING")
+    logging.info(f"skip sam3 model--> {SKIP_SAM3_LOADING}")
 except Exception as e:
     logging.error(f"SKIP_SAM3_LOADING is encounter some error {e}")
     

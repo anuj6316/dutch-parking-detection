@@ -1,6 +1,6 @@
 import path from 'path';
 
-const BASE_PATH = '/home/mindmap/Documents/dutch-parking-detection/new_frontend/public/merged-images';
+const BASE_PATH = '/home/mindmap/Desktop/dutch-parking-detection/new_frontend/public/merged-images';
 
 export const getMergedImagesBasePath = (): string => {
   return BASE_PATH;
@@ -10,7 +10,10 @@ export const getMunicipalityDirectory = (municipality: string): string => {
   return path.join(BASE_PATH, municipality);
 };
 
-export const getMergedImagePath = (municipality: string, index: number): string => {
+export const getMergedImagePath = (municipality: string, index: number, hash?: string): string => {
+  if (municipality === 'unified' && hash) {
+    return path.join(getMunicipalityDirectory('unified'), `${hash}.jpg`);
+  }
   const fileName = `merged-${municipality}-${index.toString().padStart(3, '0')}.jpg`;
   return path.join(getMunicipalityDirectory(municipality), fileName);
 };

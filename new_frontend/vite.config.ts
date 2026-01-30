@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  
+
   return {
     plugins: [react()],
     resolve: {
@@ -28,6 +28,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api': {
           target: 'http://localhost:8000',
+          // target: 'https://demo.backend.aishree.com',
           changeOrigin: true,
           rewrite: (path: string) => path.replace(/^\/api/, ''),
         },

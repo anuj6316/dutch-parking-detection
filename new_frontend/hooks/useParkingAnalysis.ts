@@ -3,7 +3,7 @@ import { Space, JobMetrics, LocationInfo, DetectionResult } from '../types';
 import { ProcessingStep } from '../components/ProcessingStatus';
 import { fetch9CenterGrids } from '../utils/imageUtils';
 import { CENTER_GRID_COLS, CENTER_GRID_ROWS } from '../utils/geoUtils';
-import { API_ENDPOINTS } from '../src/api/config';
+import { API_ENDPOINTS, SAVE_IMAGES_ENABLED } from '../src/api/config';
 import { saveAllMergedImages } from '../utils/fileUtils';
 
 interface UseParkingAnalysisProps {
@@ -66,11 +66,15 @@ export const useParkingAnalysis = ({ apiKey }: UseParkingAnalysisProps) => {
             setTileImages(fetchResult.tiles);
             setTileConfigs(fetchResult.tileConfigs);
 
-            const saveResult = await saveAllMergedImages(fetchResult.tiles, municipality);
-            if (saveResult.success) {
-                console.log(`[Analysis] Saved merged images to local directory`);
+            if (SAVE_IMAGES_ENABLED) {
+                const saveResult = await saveAllMergedImages(fetchResult.tiles, 'unified');
+                if (saveResult.success) {
+                    console.log(`[Analysis] Saved merged images to unified pool`);
+                } else {
+                    console.warn(`[Analysis] Failed to save merged images: ${saveResult.error}`);
+                }
             } else {
-                console.warn(`[Analysis] Failed to save merged images: ${saveResult.error}`);
+                console.log(`[Analysis] Image logging is disabled (SAVE_IMAGES_ENABLED=false)`);
             }
 
             const fetchStatus = fetchResult.failedIndices.length > 0

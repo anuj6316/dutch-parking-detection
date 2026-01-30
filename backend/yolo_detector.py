@@ -24,12 +24,12 @@ class YOLODetector:
         logger.info(f"[YOLO] Loaded model from {model_path}")
 
     def detect_parking_spaces(
-        self, image: Image.Image, confidence: float = 0.15
+        self, image: Image.Image, confidence: float = 0.25
     ) -> List[Dict[str, Any]]:
         """Detect parking spaces using YOLO with explicit .predict() pattern."""
         results = self.model.predict(
             source=image,
-            imgsz=1024,
+            imgsz=640,
             conf=confidence,
             verbose=False,
             save=False,

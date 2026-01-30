@@ -1,0 +1,17 @@
+services:
+  label-studio:
+    image: heartexlabs/label-studio:latest
+    container_name: label-studio
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./labelstudio-data:/label-studio/data
+      - /home/mindmap/Desktop/dutch-parking-detection/data:/datasets
+    environment:
+      - LOCAL_FILES_SERVING_ENABLED=true
+      - LABEL_STUDIO_DISABLE_SIGNUP=true
+      - LABEL_STUDIO_USERNAME=admin
+      - LABEL_STUDIO_PASSWORD=admin
+      - DJANGO_ALLOW_UNSAFE_INLINE_MARKDOWN=true
+      - LABEL_STUDIO_ALLOW_UNSAFE_INLINE_MARKDOWN=true
+      - LOCAL_FILES_DOCUMENT_ROOT=/label-studio/data/media

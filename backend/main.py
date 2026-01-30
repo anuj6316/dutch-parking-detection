@@ -12,7 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from dotenv import load_dotenv
-load_dotenv()
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 from pipeline import PipelineOrchestrator
 
@@ -134,8 +135,19 @@ async def save_images(request: SaveImagesRequest):
     for img in request.images:
         index = img.get("index", 0)
         image_base64 = img.get("image_base64", "")
-        file_name = f"merged-{request.municipality}-{str(index).zfill(3)}.jpg"
+        hash_val = img.get("hash")
+        
+        if hash_val:
+            file_name = f"{hash_val}.jpg"
+        else:
+            file_name = f"merged-{request.municipality}-{str(index).zfill(3)}.jpg"
+            
         file_path = municipality_dir / file_name
+
+        if file_path.exists():
+            logger.info(f"[API] Skipping already saved image: {file_path}")
+            saved_files.append(str(file_path))
+            continue
 
         try:
             image_data = base64.b64decode(image_base64)

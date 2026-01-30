@@ -45,7 +45,7 @@ except Exception as e:
 
 # Skip SAM3 loading for faster testing - set to True to enable
 try:
-    SKIP_SAM3_LOADING = os.environ.get("SKIP_SAM3_LOADING")
+    SKIP_SAM3_LOADING = True
     logging.info(f"skip sam3 model--> {SKIP_SAM3_LOADING}")
 except Exception as e:
     logging.error(f"SKIP_SAM3_LOADING is encounter some error {e}")
@@ -58,11 +58,13 @@ sam3_processor = None
 device = "cpu"
 
 if not SKIP_SAM3_LOADING:
+    logging.info(f"SKIP_SAM3_LOADING: {SKIP_SAM3_LOADING}")
     try:
         import torch
         from transformers import Sam3Processor, Sam3Model
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
+        # device = "cpu"
         logger.info(f"[VehicleCounter] Initializing SAM3 on device: {device}")
 
         sam3_model = Sam3Model.from_pretrained(

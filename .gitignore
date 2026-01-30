@@ -33,3 +33,15 @@ models/*
 *.pt
 .env
 experiments/TEST_K3-a-2.pdf
+
+eindhoven-V1/
+eindhoven-V1/*
+
+backend/public/
+backend/public/*
+
+dataset/
+dataset/*
+
+scripts/labelstudio-data/
+scripts/labelstudio-data/*

@@ -6,6 +6,17 @@ export interface SaveImageResult {
   error?: string;
 }
 
+/**
+ * Generates a SHA-256 hash of a base64 image string for deduplication.
+ */
+export const generateImageHash = async (dataUrl: string): Promise<string> => {
+  const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+  const msgUint8 = new TextEncoder().encode(base64Data);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
 export const saveMergedImage = async (
   dataUrl: string,
   municipality: string,
@@ -13,12 +24,13 @@ export const saveMergedImage = async (
 ): Promise<SaveImageResult> => {
   try {
     const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+    const hash = await generateImageHash(dataUrl);
 
     const response = await fetch(API_ENDPOINTS.SAVE_IMAGES, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        images: [{ image_base64: base64Data, index }],
+        images: [{ image_base64: base64Data, index, hash }],
         municipality
       })
     });
@@ -40,13 +52,14 @@ export const saveMergedImage = async (
 
 export const saveAllMergedImages = async (
   dataUrls: string[],
-  municipality: string
+  municipality: string = 'unified'
 ): Promise<SaveImageResult> => {
   try {
-    const images = dataUrls.map((dataUrl, index) => {
+    const images = await Promise.all(dataUrls.map(async (dataUrl, index) => {
       const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-      return { image_base64: base64Data, index };
-    });
+      const hash = await generateImageHash(dataUrl);
+      return { image_base64: base64Data, index, hash };
+    }));
 
     const response = await fetch(API_ENDPOINTS.SAVE_IMAGES, {
       method: 'POST',
@@ -59,7 +72,7 @@ export const saveAllMergedImages = async (
     }
 
     const result = await response.json();
-    console.log(`[FileUtils] Saved ${result.saved_count} images via backend`);
+    console.log(`[FileUtils] Saved ${result.saved_count} images via backend (Unified Pool)`);
 
     return { success: true, filePath: `Saved ${result.saved_count} files` };
   } catch (error) {

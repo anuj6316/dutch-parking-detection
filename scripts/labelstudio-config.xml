@@ -1,0 +1,6 @@
+<View>
+  <Image name="image" value="$image" zoom="true" zoomControl="true"/>
+  <PolygonLabels name="label" toName="image" fillOpacity="0.2" strokeWidth="3">
+    <Label value="Parking" background="green"/>
+  </PolygonLabels>
+</View>

@@ -6,12 +6,6 @@ resolution-markers = [
     "sys_platform != 'win32'",
 ]
 
-[manifest]
-members = [
-    "dutch-parking-detection",
-    "experiments",
-]
-
 [[package]]
 name = "accelerate"
 version = "1.12.0"
@@ -320,29 +314,6 @@ wheels = [
 [package.optional-dependencies]
 ini = [
     { name = "configobj" },
-]
-
-[[package]]
-name = "experiments"
-version = "0.1.0"
-source = { virtual = "experiments" }
-dependencies = [
-    { name = "accelerate" },
-    { name = "bitsandbytes" },
-    { name = "pillow" },
-    { name = "torch" },
-    { name = "tqdm" },
-    { name = "transformers" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "accelerate", specifier = ">=0.20.0" },
-    { name = "bitsandbytes", specifier = ">=0.41.0" },
-    { name = "pillow", specifier = ">=9.0.0" },
-    { name = "torch", specifier = ">=2.1.0" },
-    { name = "tqdm", specifier = ">=4.65.0" },
-    { name = "transformers", git = "https://github.com/huggingface/transformers.git" },
 ]
 
 [[package]]

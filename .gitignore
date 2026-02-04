@@ -45,3 +45,6 @@ dataset/*
 
 scripts/labelstudio-data/
 scripts/labelstudio-data/*
+
+yolov26x/
+yolov26x/*

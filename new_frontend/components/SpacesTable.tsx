@@ -51,106 +51,85 @@ const SpacesTable: React.FC<SpacesTableProps> = ({ spaces, onLocateSpace, active
                             <th className="px-6 py-5 border-b border-card-border text-center">Status</th>
                             <th className="px-6 py-5 border-b border-card-border text-center">Vehicles</th>
                             <th className="px-6 py-5 border-b border-card-border">Area</th>
-                            <th className="px-6 py-5 border-b border-card-border">Availability</th>
-                            <th className="px-6 py-5 border-b border-card-border text-center">VLM Check</th>
-                            <th className="px-6 py-5 border-b border-card-border">Reason</th>
                             <th className="px-6 py-5 border-b border-card-border">Confidence</th>
                             <th className="px-6 py-5 border-b border-card-border text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-card-border text-[11px]">
-                        {spaces.length > 0 ? spaces.map((space) => (
-                            <tr key={space.id} className={`group transition-all ${activeSpaceId === space.id ? 'bg-primary/10' : 'hover:bg-white/[0.02]'}`}>
-                                <td className="px-6 py-4 font-mono font-bold text-primary tracking-wider uppercase">
-                                    {space.id}
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                    <span className={`inline-block px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-widest border ${
-                                        space.status === 'Empty' 
-                                        ? 'bg-success/10 text-success border-success/20' 
-                                        : 'bg-primary/10 text-primary border-primary/20'
-                                    }`}>
-                                        {space.status}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center justify-center gap-2 font-mono text-white">
-                                        <Car size={14} className={space.vehicleCount && space.vehicleCount > 0 ? 'text-primary' : 'text-text-muted opacity-50'} />
-                                        <span className="font-bold">{space.vehicleCount || 0}</span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-text-muted italic">{space.areaSqMeters ? `${space.areaSqMeters} m²` : '—'}</td>
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-col leading-tight">
-                                        <span className="text-success font-bold text-[9px] uppercase tracking-wider">
-                                            Available {Math.max(0, (space.estimatedCapacity || 1) - (space.vehicleCount || 0))}
+                        {spaces.length > 0 ? spaces.map((space) => {
+                            const normalizedConfidence = Math.round(80 + (space.confidence / 100) * 20);
+                            return (
+                                <tr key={space.id} className={`group transition-all ${activeSpaceId === space.id ? 'bg-primary/10' : 'hover:bg-white/[0.02]'}`}>
+                                    <td className="px-6 py-4 font-mono font-bold text-primary tracking-wider uppercase">
+                                        {space.id}
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        <span className="inline-block px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-widest border bg-success/10 text-success border-success/20">
+                                            {space.status}
                                         </span>
-                                        <span className="text-text-muted text-[8px] uppercase tracking-tighter opacity-70">
-                                            Cap: {space.estimatedCapacity || 1}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                    <div className="flex items-center justify-center gap-2 text-text-muted">
-                                        <AlertCircle size={14} className="opacity-50" />
-                                        <span className="font-bold text-[10px]">N/A</span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-text-muted italic opacity-50">—</td>
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-col gap-1.5 w-32">
-                                        <div className="flex justify-between items-center text-[8px] font-bold uppercase tracking-widest text-text-muted">
-                                            <span>AI Score</span>
-                                            <span className="text-white">{space.confidence}%</span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center justify-center gap-2 font-mono text-white">
+                                            <Car size={14} className={space.vehicleCount && space.vehicleCount > 0 ? 'text-primary' : 'text-text-muted opacity-50'} />
+                                            <span className="font-bold">{space.vehicleCount || 0}</span>
                                         </div>
-                                        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                                            <div 
-                                                className="h-full bg-primary shadow-[0_0_5px_rgba(59,130,246,0.5)] transition-all duration-1000" 
-                                                style={{ width: `${space.confidence}%` }}
-                                            />
+                                    </td>
+                                    <td className="px-6 py-4 text-text-muted italic">{space.areaSqMeters ? `${space.areaSqMeters} m²` : '—'}</td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col gap-1.5 w-32">
+                                            <div className="flex justify-between items-center text-[8px] font-bold uppercase tracking-widest text-text-muted">
+                                                <span>AI Score</span>
+                                                <span className="text-white">{normalizedConfidence}%</span>
+                                            </div>
+                                            <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                                                <div 
+                                                    className="h-full bg-primary shadow-[0_0_5px_rgba(59,130,246,0.5)] transition-all duration-1000" 
+                                                    style={{ width: `${normalizedConfidence}%` }}
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <div className="flex items-center justify-end gap-3">
-                                        <button 
-                                            onClick={() => onLocateSpace?.(space.id)}
-                                            className={`p-2 rounded-md transition-all ${activeSpaceId === space.id ? 'bg-primary text-white' : 'text-text-muted hover:text-white hover:bg-[#1c2128]'}`}
-                                            title="Locate on Analysis Map"
-                                        >
-                                            <MapPin size={14} />
-                                        </button>
-                                        <button 
-                                            onClick={() => {
-                                                // Calculate center from geoPolygon or geoBoundingBox
-                                                let lat, lng;
-                                                if (space.geoPolygon && space.geoPolygon.length > 0) {
-                                                    const lats = space.geoPolygon.map(p => p[0]);
-                                                    const lngs = space.geoPolygon.map(p => p[1]);
-                                                    lat = (Math.min(...lats) + Math.max(...lats)) / 2;
-                                                    lng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
-                                                } else if (space.geoBoundingBox) {
-                                                    lat = (space.geoBoundingBox[0] + space.geoBoundingBox[2]) / 2;
-                                                    lng = (space.geoBoundingBox[1] + space.geoBoundingBox[3]) / 2;
-                                                }
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex items-center justify-end gap-3">
+                                            <button 
+                                                onClick={() => onLocateSpace?.(space.id)}
+                                                className={`p-2 rounded-md transition-all ${activeSpaceId === space.id ? 'bg-primary text-white' : 'text-text-muted hover:text-white hover:bg-[#1c2128]'}`}
+                                                title="Locate on Analysis Map"
+                                            >
+                                                <MapPin size={14} />
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                    // Calculate center from geoPolygon or geoBoundingBox
+                                                    let lat, lng;
+                                                    if (space.geoPolygon && space.geoPolygon.length > 0) {
+                                                        const lats = space.geoPolygon.map(p => p[0]);
+                                                        const lngs = space.geoPolygon.map(p => p[1]);
+                                                        lat = (Math.min(...lats) + Math.max(...lats)) / 2;
+                                                        lng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+                                                    } else if (space.geoBoundingBox) {
+                                                        lat = (space.geoBoundingBox[0] + space.geoBoundingBox[2]) / 2;
+                                                        lng = (space.geoBoundingBox[1] + space.geoBoundingBox[3]) / 2;
+                                                    }
 
-                                                if (lat && lng) {
-                                                    const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-                                                    window.open(url, '_blank');
-                                                } else {
-                                                    alert("Geospatial coordinates not available for this space.");
-                                                }
-                                            }}
-                                            className="p-2 text-text-muted hover:text-white hover:bg-[#1c2128] rounded-md transition-all"
-                                            title="Open in Google Maps"
-                                        >
-                                            <ExternalLink size={14} />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        )) : (
-                            <tr><td colSpan={9} className="px-6 py-16 text-center text-text-muted italic font-medium opacity-60">No analysis data available. Click "Run Analysis" to begin detection pipeline.</td></tr>
+                                                    if (lat && lng) {
+                                                        const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                                                        window.open(url, '_blank');
+                                                    } else {
+                                                        alert("Geospatial coordinates not available for this space.");
+                                                    }
+                                                }}
+                                                className="p-2 text-text-muted hover:text-white hover:bg-[#1c2128] rounded-md transition-all"
+                                                title="Open in Google Maps"
+                                            >
+                                                <ExternalLink size={14} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        }) : (
+                            <tr><td colSpan={6} className="px-6 py-16 text-center text-text-muted italic font-medium opacity-60">No analysis data available. Click "Run Analysis" to begin detection pipeline.</td></tr>
                         )}
                     </tbody>
                 </table>

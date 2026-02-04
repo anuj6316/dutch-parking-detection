@@ -1,0 +1,12 @@
+# data/data.yaml
+
+path: /home/mindmap/Desktop/dutch-parking-detection/dataset   # root dataset directory (relative, cross-platform safe)
+
+train: train
+val: val
+test: images/test   # optional
+
+names: [
+  'parking'
+]
+

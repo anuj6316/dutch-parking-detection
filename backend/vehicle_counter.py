@@ -45,7 +45,7 @@ except Exception as e:
 
 # Skip SAM3 loading for faster testing - set to True to enable
 try:
-    SKIP_SAM3_LOADING = True
+    SKIP_SAM3_LOADING = False
     logging.info(f"skip sam3 model--> {SKIP_SAM3_LOADING}")
 except Exception as e:
     logging.error(f"SKIP_SAM3_LOADING is encounter some error {e}")
@@ -55,7 +55,7 @@ except Exception as e:
 SAM3_AVAILABLE = False
 sam3_model = None
 sam3_processor = None
-device = "cpu"
+device = "gpu"
 
 if not SKIP_SAM3_LOADING:
     logging.info(f"SKIP_SAM3_LOADING: {SKIP_SAM3_LOADING}")

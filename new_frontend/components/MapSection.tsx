@@ -246,7 +246,7 @@ const MapSection: React.FC<MapSectionProps> = ({
         spaces.forEach(space => {
             if (!space.geoPolygon) return;
             const isActive = activeSpaceId === space.id;
-            const color = space.status === 'Occupied' ? '#ef4444' : '#3fb950';
+            const color = '#3fb950';
 
             const polygon = L.polygon(space.geoPolygon, {
                 color: color,
@@ -339,20 +339,6 @@ const MapSection: React.FC<MapSectionProps> = ({
 
             <div className="relative flex-1 bg-background">
                 <div ref={mapContainerRef} className="absolute inset-0 z-0" />
-
-                {/* Legend Overlay */}
-                <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2 pointer-events-none">
-                    <div className="bg-black/80 backdrop-blur-md rounded-lg p-3 border border-white/10 flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                            <span className="size-2 rounded-full bg-[#ef4444]"></span>
-                            <span className="text-[9px] font-bold text-white uppercase tracking-wider">Occupied</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="size-2 rounded-full bg-[#3fb950]"></span>
-                            <span className="text-[9px] font-bold text-white uppercase tracking-wider">Empty</span>
-                        </div>
-                    </div>
-                </div>
 
                 {/* Lat/Lng Indicator */}
                 <div className="absolute bottom-4 left-4 z-[1000] px-3 py-2 rounded-lg bg-black/80 backdrop-blur-md border border-white/10 text-[9px] font-mono text-white flex items-center gap-3 pointer-events-none">

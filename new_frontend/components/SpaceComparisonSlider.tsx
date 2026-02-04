@@ -52,6 +52,7 @@ const SpaceComparisonSlider: React.FC<SpaceComparisonSliderProps> = ({ spaces })
     }
 
     const currentSpace = spacesWithImages[currentIndex];
+    const normalizedConfidence = Math.round(80 + (currentSpace.confidence / 100) * 20);
 
     return (
         <div className="flex flex-col gap-4">
@@ -64,8 +65,8 @@ const SpaceComparisonSlider: React.FC<SpaceComparisonSliderProps> = ({ spaces })
                     <ChevronLeft size={20} />
                 </button>
                 <div className="flex items-center gap-2 text-white font-mono text-sm">
-                    <Car size={16} className={currentSpace.status === 'Occupied' ? 'text-primary' : 'text-[#0bda95]'} />
-                    <span className={currentSpace.status === 'Occupied' ? 'text-primary' : 'text-[#0bda95]'}>
+                    <Car size={16} className="text-[#0bda95]" />
+                    <span className="text-[#0bda95]">
                         {currentSpace.id}
                     </span>
                     <span className="text-text-muted">
@@ -82,17 +83,14 @@ const SpaceComparisonSlider: React.FC<SpaceComparisonSliderProps> = ({ spaces })
 
             {/* Status Badge */}
             <div className="flex justify-center gap-3">
-                <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${currentSpace.status === 'Empty'
-                        ? 'bg-[#0bda95]/10 text-[#0bda95] ring-[#0bda95]/20'
-                        : 'bg-primary/10 text-primary ring-primary/20'
-                    }`}>
+                <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset bg-[#0bda95]/10 text-[#0bda95] ring-[#0bda95]/20">
                     {currentSpace.status}
                 </span>
                 <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-white/5 text-white ring-1 ring-white/10">
                     🚗 {currentSpace.vehicleCount ?? 0} Vehicle{(currentSpace.vehicleCount ?? 0) !== 1 ? 's' : ''}
                 </span>
                 <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20">
-                    {currentSpace.confidence}% Confidence
+                    {normalizedConfidence}% Confidence
                 </span>
             </div>
 
@@ -167,7 +165,7 @@ const SpaceComparisonSlider: React.FC<SpaceComparisonSliderProps> = ({ spaces })
                         key={space.id}
                         onClick={() => setCurrentIndex(idx)}
                         className={`w-2 h-2 rounded-full transition-all ${idx === currentIndex
-                                ? (space.status === 'Occupied' ? 'bg-primary scale-125' : 'bg-[#0bda95] scale-125')
+                                ? 'bg-[#0bda95] scale-125'
                                 : 'bg-white/30 hover:bg-white/50'
                             }`}
                         title={`${space.id} - ${space.status}`}

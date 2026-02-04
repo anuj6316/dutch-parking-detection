@@ -116,11 +116,27 @@ class PipelineOrchestrator:
                 new_det['area_sq_meters'] = sum(d.get('area_sq_meters', 0) for d in original_dets)
                 new_det['merged_count'] = sum(d.get('merged_count', 1) for d in original_dets)
                 
+                # confidences = [c for d in original_dets for c in d.get('confidence', []) if c is not None]
+                # if confidences:
+                #     new_det['confidence'] = [sum(confidences) / len(confidences)]
+                # else:
+                #     new_det['confidence'] = [0]
                 confidences = [c for d in original_dets for c in d.get('confidence', []) if c is not None]
+
                 if confidences:
-                    new_det['confidence'] = [sum(confidences) / len(confidences)]
+                    c_min = min(confidences)
+                    c_max = max(confidences)
+
+                    # avoid divide-by-zero if all values are same
+                    if c_max == c_min:
+                        norm_confidences = [0.85 for _ in confidences]  # midpoint of 0.8–0.9
+                    else:
+                        norm_confidences = [
+                            0.8 + (c - c_min) * (0.9 - 0.8) / (c_max - c_min)
+                            for c in confidences
+                        ]
                 else:
-                    new_det['confidence'] = [0]
+                    norm_confidences = []
 
 
                 merged_detections.append(new_det)

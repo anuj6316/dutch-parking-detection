@@ -42,7 +42,4 @@ pred = { shell = "python prediction_script.py", cwd = "/home/mindmap/Desktop/dut
 [tool.uv.sources]
 transformers = { git = "https://github.com/huggingface/transformers.git" }
 
-[tool.uv.workspace]
-members = [
-    "experiments",
-]
+

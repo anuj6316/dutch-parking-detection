@@ -148,14 +148,15 @@ class PipelineOrchestrator:
         return merged_detections
 
     async def run(self, tiles: List[Dict], confidence: float = 0.25):
+        # sourcery skip: low-code-quality
         """Run the complete detection pipeline and stream updates."""
         all_detections = []
         all_masks = []
         failed_tiles = []
-        
+
         total_tiles = len(tiles)
         logger.info(f"[Pipeline] Starting with {total_tiles} tiles")
-        
+
         yield {"type": "log", "message": f"[Step 1/5] Initialized analysis for {total_tiles} tiles"}
         yield {"type": "progress", "value": 0}
 
@@ -170,7 +171,7 @@ class PipelineOrchestrator:
                 # YOLO Detection
                 detections = self.yolo_detector.detect_parking_spaces(image, confidence)
                 yield {"type": "log", "message": f"[Tile {idx+1}] YOLO found {len(detections)} parking spaces"}
-                
+
                 # Merge overlapping OBB detections
                 if len(detections) > 0:
                     detections_before_merge = len(detections)
@@ -182,7 +183,7 @@ class PipelineOrchestrator:
                 mask = self.mask_generator.generate_mask(image, detections)
                 mask_b64 = self._encode_image(mask)
                 all_masks.append({"tile_index": tile_idx, "mask": mask_b64})
-                
+
                 # STEP 4: Vehicle Detection
                 tile_detections = []
                 total_vehicles = 0
@@ -205,9 +206,9 @@ class PipelineOrchestrator:
                             px, py = max(0, min(img_w - 1, float(poly_points[i]))), max(0, min(img_h - 1, float(poly_points[i+1])))
                             lat, lng = self._pixel_to_geo(px, py, img_w, img_h, tile_bounds)
                             geo_polygon.append([lat, lng])
-                        if len(geo_polygon) > 0 and geo_polygon[0] != geo_polygon[-1]:
+                        if geo_polygon and geo_polygon[0] != geo_polygon[-1]:
                             geo_polygon.append([geo_polygon[0][0], geo_polygon[0][1]])
-                    
+
                     lats, lngs = [p[0] for p in geo_polygon], [p[1] for p in geo_polygon]
                     geo_bbox = [min(lats), min(lngs), max(lats), max(lngs)] if geo_polygon else [0,0,0,0]
 
@@ -242,12 +243,12 @@ class PipelineOrchestrator:
         detections_before_global_merge = len(all_detections)
         all_detections = self._merge_geo_polygons(all_detections)
         reduction = detections_before_global_merge - len(all_detections)
-        
+
         if reduction > 0:
             yield {"type": "log", "message": f"[Pipeline] Global merge complete. Reduced detections by {reduction}."}
 
         yield {"type": "progress", "value": 100}
-        
+
         # Final result structure
         yield {
             "type": "final_result",
@@ -299,7 +300,7 @@ class PipelineOrchestrator:
     def _encode_image(self, image: Image.Image) -> str:
         buffer = io.BytesIO()
         image.save(buffer, format="JPEG", quality=85)
-        return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
+        return f"data:image/jpeg;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
     def _crop_from_bbox(self, image: Image.Image, bbox: List[float]) -> Image.Image:
         x1, y1, x2, y2 = [float(b) for b in bbox]

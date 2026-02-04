@@ -48,3 +48,6 @@ scripts/labelstudio-data/*
 
 yolov26x/
 yolov26x/*
+
+references/
+references/*

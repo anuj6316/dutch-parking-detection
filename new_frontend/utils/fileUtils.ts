@@ -86,3 +86,18 @@ export const base64ToBuffer = (dataUrl: string): Buffer => {
   const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
   return Buffer.from(base64Data, 'base64');
 };
+
+/**
+ * Triggers a browser download for a given content string.
+ */
+export const downloadFile = (content: string, fileName: string, contentType: string) => {
+  const blob = new Blob([content], { type: contentType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};

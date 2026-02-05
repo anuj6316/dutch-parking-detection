@@ -11,6 +11,7 @@ export interface Area {
 interface JobHeaderProps {
     onRerun: () => void;
     onTerminate?: () => void;
+    onExport?: (format: 'GeoJSON' | 'CSV') => void;
     isAnalyzing: boolean;
     onBack: () => void;
     areas: Area[];
@@ -29,6 +30,7 @@ interface JobHeaderProps {
 const JobHeader: React.FC<JobHeaderProps> = ({
     onRerun,
     onTerminate,
+    onExport,
     isAnalyzing,
     onBack,
     areas,
@@ -239,6 +241,7 @@ const JobHeader: React.FC<JobHeaderProps> = ({
                         <RotateCcw size={16} /> Re-run
                     </button>
                     <button 
+                        onClick={() => onExport?.('GeoJSON')}
                         className="flex items-center gap-2 bg-[#1c2128] border border-card-border text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-white/5 transition-all"
                     >
                         <Download size={16} /> Export Data

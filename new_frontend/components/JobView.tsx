@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import JobHeader, { Area } from './JobHeader';
 import ProcessingStatus from './ProcessingStatus';
@@ -9,6 +8,8 @@ import SpacesTable from './SpacesTable';
 import AreaSelectorMap from './AreaSelectorMap';
 import { useParkingAnalysis } from '../hooks/useParkingAnalysis';
 import { getDistanceMeters, METERS_PER_MERGED_BLOCK, calculateMunicipalityCoverage } from '../utils/geoUtils';
+import { convertToGeoJSON, convertToCSV } from '../utils/exportUtils';
+import { downloadFile } from '../utils/fileUtils';
 import municipalitiesList from '../data/dutch_municipalities.json';
 
 const PREDEFINED_AREAS: Area[] = [
@@ -198,6 +199,23 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
         runAnalysis(center, cols, rows, selectedAreaId);
     };
 
+    const handleExport = (format: 'GeoJSON' | 'CSV') => {
+        if (spaces.length === 0) {
+            alert("No data available to export. Run analysis first.");
+            return;
+        }
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        
+        if (format === 'GeoJSON') {
+            const content = convertToGeoJSON(spaces);
+            downloadFile(content, `parking-analysis-${timestamp}.geojson`, 'application/geo+json');
+        } else if (format === 'CSV') {
+            const content = convertToCSV(spaces);
+            downloadFile(content, `parking-analysis-${timestamp}.csv`, 'text/csv');
+        }
+    };
+
     const handleLocateSpace = (spaceId: string) => {
         setActiveSpaceId(spaceId);
     };
@@ -243,6 +261,7 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
             <JobHeader
                 onRerun={handleRunClick}
                 onTerminate={terminateAnalysis}
+                onExport={handleExport}
                 isAnalyzing={isAnalyzing}
                 onBack={onBack}
                 areas={ALL_AREAS}
@@ -288,6 +307,7 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
                     totalImages={totalImages}
                     gridCols={useCustomArea ? gridDimensions.cols : Math.ceil(Math.sqrt(totalImages))}
                     gridRows={useCustomArea ? gridDimensions.rows : Math.ceil(totalImages / Math.ceil(Math.sqrt(totalImages)))}
+                    spaces={spaces}
                     municipalityCoverage={municipalityCoverage}
                     isFetchingLocation={isFetchingLocation}
                 />

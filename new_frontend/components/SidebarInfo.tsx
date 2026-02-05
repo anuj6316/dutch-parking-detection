@@ -1,12 +1,15 @@
 import React from 'react';
 import { FileJson, FileSpreadsheet, Download, Map, ExternalLink, Globe, LayoutGrid, Maximize2 } from 'lucide-react';
-import { LocationInfo } from '../types';
+import { LocationInfo, Space } from '../types';
+import { convertToGeoJSON, convertToCSV } from '../utils/exportUtils';
+import { downloadFile } from '../utils/fileUtils';
 
 interface SidebarInfoProps {
     locationInfo?: LocationInfo | null;
     totalImages: number;
     gridCols: number;
     gridRows: number;
+    spaces: Space[];
     municipalityCoverage?: {
         totalBlocks: number;
         areaSqKm: number;
@@ -23,12 +26,34 @@ const SidebarInfo: React.FC<SidebarInfoProps> = ({
     totalImages, 
     gridCols, 
     gridRows, 
+    spaces,
     municipalityCoverage, 
     isFetchingLocation 
 }) => {
     const handleDownload = (format: string) => {
-        alert(`Downloading ${format} export...`);
+        if (spaces.length === 0) {
+            alert("No data available to export. Run analysis first.");
+            return;
+        }
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        
+        if (format === 'GeoJSON') {
+            const content = convertToGeoJSON(spaces);
+            downloadFile(content, `parking-analysis-${timestamp}.geojson`, 'application/geo+json');
+        } else if (format === 'CSV') {
+            const content = convertToCSV(spaces);
+            downloadFile(content, `parking-analysis-${timestamp}.csv`, 'text/csv');
+        }
     };
+
+    // Calculate approximate file sizes
+    const geojsonSize = spaces.length > 0 
+        ? (convertToGeoJSON(spaces).length / 1024).toFixed(1) 
+        : "0";
+    const csvSize = spaces.length > 0 
+        ? (convertToCSV(spaces).length / 1024).toFixed(1) 
+        : "0";
 
     return (
         <div className="lg:col-span-1 w-full flex flex-col gap-6">
@@ -184,7 +209,7 @@ const SidebarInfo: React.FC<SidebarInfoProps> = ({
                             </div>
                             <div className="flex flex-col items-start">
                                 <span className="text-white text-sm font-bold">GeoJSON</span>
-                                <span className="text-text-muted text-xs">Vector data (2.4 MB)</span>
+                                <span className="text-text-muted text-xs">Vector data ({geojsonSize} KB)</span>
                             </div>
                         </div>
                         <Download size={18} className="text-text-muted group-hover:text-white" />
@@ -199,7 +224,7 @@ const SidebarInfo: React.FC<SidebarInfoProps> = ({
                             </div>
                             <div className="flex flex-col items-start">
                                 <span className="text-white text-sm font-bold">CSV Report</span>
-                                <span className="text-text-muted text-xs">Spreadsheet (850 KB)</span>
+                                <span className="text-text-muted text-xs">Spreadsheet ({csvSize} KB)</span>
                             </div>
                         </div>
                         <Download size={18} className="text-text-muted group-hover:text-white" />

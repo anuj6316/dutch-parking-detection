@@ -41,6 +41,7 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
     const [customBounds, setCustomBounds] = useState<{
         minLat: number; maxLat: number; minLng: number; maxLng: number
     } | null>(null);
+    const [customAreaName, setCustomAreaName] = useState<string | null>(null);
     
     // State to hold fetched coordinates for municipalities
     const [dynamicBbox, setDynamicBbox] = useState<string | null>(null);
@@ -156,6 +157,7 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
         detectionConfidence,
         setDetectionConfidence,
         resetAnalysis,
+        terminateAnalysis,
         runAnalysis
     } = useParkingAnalysis({ apiKey: process.env.API_KEY });
 
@@ -206,11 +208,17 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
         } else {
             setUseCustomArea(false);
             setCustomBounds(null);
+            setCustomAreaName(null);
         }
     };
 
-    const handleAreaSelected = (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => {
+    const handleEditCustomArea = () => {
+        setShowAreaSelector(true);
+    };
+
+    const handleAreaSelected = (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }, locationName: string | null) => {
         setCustomBounds(bounds);
+        setCustomAreaName(locationName);
         setUseCustomArea(true);
         setShowAreaSelector(false);
     };
@@ -221,10 +229,6 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
             setUseCustomArea(false);
         }
     };
-
-    const customAreaName = customBounds
-        ? `Custom Area (${gridDimensions.cols}x${gridDimensions.rows} Tiles)`
-        : undefined;
 
     return (
         <div className="w-full max-w-[1400px] flex flex-col gap-6">
@@ -238,6 +242,7 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
 
             <JobHeader
                 onRerun={handleRunClick}
+                onTerminate={terminateAnalysis}
                 isAnalyzing={isAnalyzing}
                 onBack={onBack}
                 areas={ALL_AREAS}
@@ -247,7 +252,8 @@ const JobView: React.FC<JobViewProps> = ({ onBack }) => {
                 setDetectionConfidence={setDetectionConfidence}
                 useCustomArea={useCustomArea}
                 onToggleCustomArea={handleToggleCustomArea}
-                customAreaName={customAreaName}
+                onEditCustomArea={handleEditCustomArea}
+                customAreaName={customAreaName || undefined}
                 totalImages={totalImages}
                 setTotalImages={setTotalImages}
             />

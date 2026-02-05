@@ -1,24 +1,24 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
-import { MapPin, Check, X, Move, ZoomIn, ZoomOut, Link as LinkIcon } from 'lucide-react';
-import { parseGoogleMapsUrl } from '../utils/geoUtils';
+import { MapPin, Check, X, Move, ZoomIn, ZoomOut, Search, Loader2 } from 'lucide-react';
+import { OpenStreetMapProvider } from 'leaflet-geosearch';
+import { parseLocationInput } from '../utils/geoUtils';
 
 interface AreaSelectorMapProps {
-    onAreaSelected: (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => void;
+    onAreaSelected: (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }, locationName: string | null) => void;
     onCancel: () => void;
     initialCenter?: { lat: number; lng: number };
 }
 
 // Updated analysis area size to target exactly 30 tiles (6x5 grid)
-// Each merged block is ~70m. 420/70 = 6. 350/70 = 5.
 const AREA_WIDTH_METERS = 420;
 const AREA_HEIGHT_METERS = 350;
 
 const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
     onAreaSelected,
     onCancel,
-    initialCenter = { lat: 52.1538, lng: 5.3725 } // Default: Amersfoort
+    initialCenter = { lat: 52.1538, lng: 5.3725 }
 }) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<L.Map | null>(null);
@@ -30,12 +30,22 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
         maxLng: number;
     } | null>(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
     const [manualCoords, setManualCoords] = useState<{lat: string, lng: string}>({ 
         lat: initialCenter.lat.toFixed(5), 
         lng: initialCenter.lng.toFixed(5) 
     });
-    const [googleMapsUrl, setGoogleMapsUrl] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
     const [locationName, setLocationName] = useState<string | null>(null);
+
+    // Initialize provider for geocoding
+    const provider = useRef(new OpenStreetMapProvider({
+        params: {
+            'accept-language': 'en',
+            // countrycodes: 'nl'
+            // Removed countrycodes restriction to allow global searches
+        },
+    }));
 
     const fetchLocationName = async (lat: number, lng: number) => {
         try {
@@ -54,11 +64,8 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
         }
     };
 
-    // Calculate bounds from center point
-    const calculateBoundsFromCenter = (lat: number, lng: number) => {
-        // 1 Degree Lat ~= 111,132 meters
+    const calculateBoundsFromCenter = useCallback((lat: number, lng: number) => {
         const metersPerDegLat = 111132.92;
-        // 1 Degree Lng ~= 111,412 * cos(lat) meters
         const metersPerDegLng = 111412.84 * Math.cos(lat * (Math.PI / 180));
 
         const deltaLat = (AREA_HEIGHT_METERS / 2) / metersPerDegLat;
@@ -70,10 +77,9 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
             minLng: lng - deltaLng,
             maxLng: lng + deltaLng
         };
-    };
+    }, []);
 
-    // Update rectangle position on map
-    const updateRectangle = (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => {
+    const updateRectangle = useCallback((bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => {
         if (rectangleRef.current) {
             rectangleRef.current.setBounds([
                 [bounds.minLat, bounds.minLng],
@@ -81,13 +87,59 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
             ]);
         }
         setCurrentBounds(bounds);
-        // Update manual inputs to reflect center
         const centerLat = (bounds.minLat + bounds.maxLat) / 2;
         const centerLng = (bounds.minLng + bounds.maxLng) / 2;
         setManualCoords({
             lat: centerLat.toFixed(5),
             lng: centerLng.toFixed(5)
         });
+    }, []);
+
+    const handleSearch = async (query: string) => {
+        if (!query || query.trim().length < 2) return;
+        
+        setIsSearching(true);
+        console.log("[Search] Querying:", query);
+
+        try {
+            // 1. Try Coordinate/URL parsing first
+            const coords = parseLocationInput(query);
+            if (coords) {
+                console.log("[Search] Coords found in input:", coords);
+                const newBounds = calculateBoundsFromCenter(coords.lat, coords.lng);
+                updateRectangle(newBounds);
+                if (mapInstanceRef.current) {
+                    mapInstanceRef.current.flyTo([coords.lat, coords.lng], 18);
+                }
+                fetchLocationName(coords.lat, coords.lng);
+                setIsSearching(false);
+                return;
+            }
+
+            // 2. Fallback to OpenStreetMap Geocoding
+            const results = await provider.current.search({ query: query });
+            if (results && results.length > 0) {
+                const bestMatch = results[0];
+                console.log("[Search] Geocoding match:", bestMatch);
+                
+                const { y: lat, x: lng } = bestMatch;
+                const newBounds = calculateBoundsFromCenter(lat, lng);
+                updateRectangle(newBounds);
+                
+                if (mapInstanceRef.current) {
+                    mapInstanceRef.current.flyTo([lat, lng], 18);
+                }
+                
+                setLocationName(bestMatch.label.split(',')[0]);
+                setSearchQuery(''); // Clear on success
+            } else {
+                console.warn("[Search] No results found for query");
+            }
+        } catch (error) {
+            console.error("[Search] Error during search:", error);
+        } finally {
+            setIsSearching(false);
+        }
     };
 
     const handleManualInputSubmit = () => {
@@ -104,50 +156,26 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
         }
     };
 
-    const handleGoogleUrlSubmit = (url: string) => {
-        console.log("handleGoogleUrlSubmit triggered with:", url);
-        const coords = parseGoogleMapsUrl(url);
-        if (coords) {
-            console.log("Extracted coords:", coords);
-            const newBounds = calculateBoundsFromCenter(coords.lat, coords.lng);
-            updateRectangle(newBounds);
-            if (mapInstanceRef.current) {
-                console.log("Flying map to:", [coords.lat, coords.lng]);
-                mapInstanceRef.current.flyTo([coords.lat, coords.lng], 17);
-            } else {
-                console.error("mapInstanceRef.current is null!");
-            }
-            fetchLocationName(coords.lat, coords.lng);
-            setGoogleMapsUrl(''); // Clear after success
-        } else {
-            console.warn("Could not parse coordinates from URL");
-        }
-    };
-
     useEffect(() => {
         if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-        // Initialize map
         const map = L.map(mapContainerRef.current, {
             center: [initialCenter.lat, initialCenter.lng],
             zoom: 17,
-            zoomControl: false
+            zoomControl: false,
+            doubleClickZoom: false // Disabled because we use dblclick to position
         });
 
-        // Add zoom control to bottom right
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // Add Google Satellite Imagery
         L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
             minZoom: 1,
             maxZoom: 22,
             attribution: 'Google'
         }).addTo(map);
 
-        // Calculate initial bounds centered on map
         const initialBounds = calculateBoundsFromCenter(initialCenter.lat, initialCenter.lng);
 
-        // Create the fixed-size draggable rectangle
         const rectangle = L.rectangle(
             [[initialBounds.minLat, initialBounds.minLng], [initialBounds.maxLat, initialBounds.maxLng]],
             {
@@ -164,11 +192,9 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
         setCurrentBounds(initialBounds);
         fetchLocationName(initialCenter.lat, initialCenter.lng);
 
-        // Variables for dragging
         let dragStartLatLng: L.LatLng | null = null;
         let rectCenterAtDragStart: L.LatLng | null = null;
 
-        // Enable dragging via mouse events on the rectangle
         rectangle.on('mousedown', (e: L.LeafletMouseEvent) => {
             L.DomEvent.stopPropagation(e);
             map.dragging.disable();
@@ -195,15 +221,8 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
                 map.off('mousemove', onMouseMove);
                 map.off('mouseup', onMouseUp);
                 
-                // Fetch location on drag end
-                if (rectCenterAtDragStart && dragStartLatLng) {
-                     // Need to calculate final center
-                     // Actually, updateRectangle has been called with final bounds.
-                     // But we don't have the final center easily available in this scope unless we recalc or read from state (which is stale in closure)
-                     // Better to read from rectangle
-                     const finalCenter = rectangle.getBounds().getCenter();
-                     fetchLocationName(finalCenter.lat, finalCenter.lng);
-                }
+                const finalCenter = rectangle.getBounds().getCenter();
+                fetchLocationName(finalCenter.lat, finalCenter.lng);
 
                 dragStartLatLng = null;
                 rectCenterAtDragStart = null;
@@ -214,32 +233,44 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
             map.on('mouseup', onMouseUp);
         });
 
-        // Double-click on map to move rectangle to that location
         map.on('dblclick', (e: L.LeafletMouseEvent) => {
             const newBounds = calculateBoundsFromCenter(e.latlng.lat, e.latlng.lng);
             updateRectangle(newBounds);
             fetchLocationName(e.latlng.lat, e.latlng.lng);
-
-            // Optionally pan map to center on rectangle
             map.panTo(e.latlng);
         });
 
         mapInstanceRef.current = map;
 
+        const timer = setTimeout(() => {
+            map.invalidateSize();
+        }, 200);
+
+        const resizeObserver = new ResizeObserver(() => {
+            if (mapInstanceRef.current) {
+                mapInstanceRef.current.invalidateSize();
+            }
+        });
+        
+        if (mapContainerRef.current) {
+            resizeObserver.observe(mapContainerRef.current);
+        }
+
         return () => {
+            clearTimeout(timer);
+            resizeObserver.disconnect();
             map.remove();
             mapInstanceRef.current = null;
             rectangleRef.current = null;
         };
-    }, [initialCenter.lat, initialCenter.lng]);
+    }, [initialCenter.lat, initialCenter.lng, calculateBoundsFromCenter, updateRectangle]);
 
     const handleConfirm = () => {
         if (currentBounds) {
-            onAreaSelected(currentBounds);
+            onAreaSelected(currentBounds, locationName);
         }
     };
 
-    // Center rectangle on current map view
     const handleCenterOnMap = () => {
         if (mapInstanceRef.current) {
             const center = mapInstanceRef.current.getCenter();
@@ -264,41 +295,33 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
                                 {locationName ? (
                                     <span className="text-white font-medium">{locationName}</span>
                                 ) : (
-                                    "Drag the rectangle or double-click to position"
+                                    "Search or drag the rectangle"
                                 )}
                             </p>
                         </div>
                     </div>
+                    
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center bg-black/40 rounded-lg p-1 border border-white/10 group focus-within:border-primary/50 transition-colors">
+                        {/* Smart Search Bar */}
+                        <div className="flex items-center bg-black/40 rounded-lg p-1 border border-white/10 group focus-within:border-primary/50 transition-all min-w-[300px]">
                             <div className="pl-2 pr-1 text-text-muted">
-                                <LinkIcon size={14} />
+                                {isSearching ? <Loader2 size={14} className="animate-spin text-primary" /> : <Search size={14} />}
                             </div>
                             <input 
                                 type="text" 
-                                value={googleMapsUrl}
-                                onChange={(e) => {
-                                    setGoogleMapsUrl(e.target.value);
-                                    // Only try to parse if it looks like a full URL or contains coordinates
-                                    if (e.target.value.includes('google.com/maps') || e.target.value.includes('@')) {
-                                        handleGoogleUrlSubmit(e.target.value);
-                                    }
-                                }}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchQuery)}
                                 onPaste={(e) => {
-                                    const pastedText = e.clipboardData.getData('text');
-                                    console.log("Pasted text:", pastedText);
-                                    handleGoogleUrlSubmit(pastedText);
+                                    const pasted = e.clipboardData.getData('text');
+                                    handleSearch(pasted);
                                 }}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        handleGoogleUrlSubmit(googleMapsUrl);
-                                    }
-                                }}
-                                placeholder="Paste Google Maps Link"
-                                className="bg-transparent border-none w-48 text-xs text-white focus:ring-0 placeholder:text-text-muted/50"
+                                placeholder="Search address or paste map link..."
+                                className="bg-transparent border-none flex-1 text-xs text-white focus:ring-0 placeholder:text-text-muted/50"
                             />
                         </div>
 
+                        {/* Coords display/manual input */}
                         <div className="flex items-center bg-black/40 rounded-lg p-1 border border-white/10">
                             <input 
                                 type="text" 
@@ -306,7 +329,7 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
                                 onChange={(e) => setManualCoords({...manualCoords, lat: e.target.value})}
                                 onKeyDown={(e) => e.key === 'Enter' && handleManualInputSubmit()}
                                 placeholder="Lat"
-                                className="bg-transparent border-none w-20 text-xs text-white text-center focus:ring-0"
+                                className="bg-transparent border-none w-20 text-xs text-white text-center focus:ring-0 font-mono"
                             />
                             <div className="w-[1px] h-4 bg-white/10"></div>
                             <input 
@@ -315,7 +338,7 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
                                 onChange={(e) => setManualCoords({...manualCoords, lng: e.target.value})}
                                 onKeyDown={(e) => e.key === 'Enter' && handleManualInputSubmit()}
                                 placeholder="Lng"
-                                className="bg-transparent border-none w-20 text-xs text-white text-center focus:ring-0"
+                                className="bg-transparent border-none w-20 text-xs text-white text-center focus:ring-0 font-mono"
                             />
                             <button 
                                 onClick={handleManualInputSubmit}
@@ -324,6 +347,7 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
                                 <Check size={12} className="text-primary" />
                             </button>
                         </div>
+
                         <button
                             onClick={onCancel}
                             className="p-2 rounded-lg hover:bg-white/10 transition-colors text-text-muted hover:text-white"
@@ -337,9 +361,8 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
                 <div className="flex-1 relative">
                     <div ref={mapContainerRef} className="absolute inset-0" />
 
-                    {/* Instructions Overlay */}
                     <div className="absolute top-4 left-4 z-[1000] pointer-events-none">
-                        <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3 border border-white/20 max-w-sm">
+                        <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3 border border-white/20 max-w-sm shadow-xl">
                             <div className="flex flex-col gap-2 text-white text-sm">
                                 <div className="flex items-center gap-2">
                                     <Move size={14} className="text-primary flex-shrink-0" />
@@ -357,33 +380,35 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
                         </div>
                     </div>
 
-                    {/* Dragging indicator */}
                     {isDragging && (
                         <div className="absolute top-4 right-4 z-[1000]">
-                            <div className="bg-primary text-white px-3 py-1.5 rounded-full text-sm font-medium animate-pulse">
+                            <div className="bg-primary text-white px-3 py-1.5 rounded-full text-sm font-medium animate-pulse shadow-lg">
                                 Dragging...
                             </div>
                         </div>
                     )}
 
-                    {/* Area size indicator */}
                     <div className="absolute bottom-4 left-4 z-[1000]">
-                        <div className="bg-black/70 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10 text-xs text-text-muted">
-                            Analysis area: <span className="text-white font-mono">{AREA_WIDTH_METERS}m × {AREA_HEIGHT_METERS}m</span>
+                        <div className="bg-black/70 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10 text-xs text-text-muted flex items-center gap-2">
+                            <span>Analysis area:</span>
+                            <span className="text-white font-mono font-bold">{AREA_WIDTH_METERS}m × {AREA_HEIGHT_METERS}m</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Footer with Actions */}
+                {/* Footer */}
                 <div className="p-4 border-t border-white/10 flex items-center justify-between bg-card-darker">
                     <div className="text-sm text-text-muted">
                         {currentBounds ? (
-                            <span className="text-green-400 flex items-center gap-2">
+                            <span className="text-green-400 flex items-center gap-2 font-medium">
                                 <Check size={16} />
                                 Center: {((currentBounds.minLat + currentBounds.maxLat) / 2).toFixed(5)}°, {((currentBounds.minLng + currentBounds.maxLng) / 2).toFixed(5)}°
                             </span>
                         ) : (
-                            <span>Initializing...</span>
+                            <span className="flex items-center gap-2">
+                                <Loader2 size={14} className="animate-spin" />
+                                Initializing...
+                            </span>
                         )}
                     </div>
                     <div className="flex items-center gap-3">
@@ -402,8 +427,8 @@ const AreaSelectorMap: React.FC<AreaSelectorMapProps> = ({
                         </button>
                         <button
                             onClick={handleConfirm}
-                            disabled={!currentBounds}
-                            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all ${currentBounds
+                            disabled={!currentBounds || isSearching}
+                            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all ${currentBounds && !isSearching
                                 ? 'bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20'
                                 : 'bg-white/5 text-white/40 cursor-not-allowed'
                                 }`}

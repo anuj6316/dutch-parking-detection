@@ -119,6 +119,17 @@ export function getGoogleSatelliteTileUrl(x: number, y: number, zoom: number = Z
     return `https://mt1.google.com/vt/lyrs=s&x=${x}&y=${y}&z=${zoom}`;
 }
 
+export function getPDOKTileUrl(x: number, y: number, zoom: number = ZOOM_LEVEL): string {
+    // Zoom 21 is not available on PDOK, max is usually 19 or 20 for high res
+    // But for consistency we use the same math.
+    return `https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/EPSG:3857/${zoom}/${x}/${y}.jpeg`;
+}
+
+export function getTileUrl(x: number, y: number, zoom: number = ZOOM_LEVEL, source: 'google' | 'pdok' = 'pdok'): string {
+    if (source === 'pdok') return getPDOKTileUrl(x, y, zoom);
+    return getGoogleSatelliteTileUrl(x, y, zoom);
+}
+
 export function calculateTileGrid(
     centerLat: number,
     centerLng: number,
@@ -264,53 +275,57 @@ export function calculateMunicipalityCoverage(geojson: any) {
 }
 
 /**
- * Extracts latitude and longitude from a Google Maps URL.
+ * Extracts latitude and longitude from a Google Maps URL or coordinate string.
  * Supports:
  * - https://www.google.com/maps/@lat,lng,zoomz
  * - https://www.google.com/maps/search/?api=1&query=lat,lng
  * - https://www.google.com/maps/place/Name/@lat,lng,zoomz
+ * - Bare coordinates: "52.1538, 5.3725"
  */
-export function parseGoogleMapsUrl(url: string): { lat: number; lng: number } | null {
-    console.log("Parsing URL:", url);
+export function parseLocationInput(input: string): { lat: number; lng: number } | null {
+    if (!input || typeof input !== 'string') return null;
+    
+    const trimmedInput = input.trim();
+    console.log("[GeoUtils] Parsing location input:", trimmedInput);
+
     try {
-        // Handle @lat,lng format (more robust regex for coordinates)
-        const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+        // 1. Check for @lat,lng format
+        const atMatch = trimmedInput.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
         if (atMatch) {
-            console.log("Matched @lat,lng:", atMatch[1], atMatch[2]);
-            return {
-                lat: parseFloat(atMatch[1]),
-                lng: parseFloat(atMatch[2])
-            };
+            return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
         }
 
-        // Handle URLs with search/place/dir etc. that have coordinates in path but not @
-        // e.g. /maps/dir/52.15,5.37/...
-        const pathMatch = url.match(/\/maps\/(?:dir|search|place)\/(-?\d+\.\d+),(-?\d+\.\d+)/);
-        if (pathMatch) {
-            console.log("Matched path lat,lng:", pathMatch[1], pathMatch[2]);
-            return {
-                lat: parseFloat(pathMatch[1]),
-                lng: parseFloat(pathMatch[2])
-            };
-        }
-
-        // Handle query=lat,lng format
-        const queryMatch = url.match(/[?&](?:query|q)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+        // 2. Check for query=lat,lng or q=lat,lng
+        const queryMatch = trimmedInput.match(/[?&](?:query|q)=(-?\d+\.\d+),(-?\d+\.\d+)/);
         if (queryMatch) {
-            console.log("Matched query/q=lat,lng:", queryMatch[1], queryMatch[2]);
-            return {
-                lat: parseFloat(queryMatch[1]),
-                lng: parseFloat(queryMatch[2])
-            };
+            return { lat: parseFloat(queryMatch[1]), lng: parseFloat(queryMatch[2]) };
         }
 
-        // Handle shortened youtu.be style or other redirects if they contain coords in the resolved string
-        // Note: Real redirects would need a fetch, but often coords are in the initial URL too.
+        // 3. Check for coordinates in path segments (e.g., .../dir/52.15,5.37/...)
+        const pathMatch = trimmedInput.match(/\/maps\/(?:dir|search|place|[\w+]+)\/(-?\d+\.\d+),(-?\d+\.\d+)/);
+        if (pathMatch) {
+            return { lat: parseFloat(pathMatch[1]), lng: parseFloat(pathMatch[2]) };
+        }
 
-        console.warn("No coordinate match found in URL");
+        // 4. Check for bare coordinates "lat, lng"
+        const bareMatch = trimmedInput.match(/^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/);
+        if (bareMatch) {
+            return { lat: parseFloat(bareMatch[1]), lng: parseFloat(bareMatch[2]) };
+        }
+
+        // 5. Last resort: search for any "lat,lng" pair in the string
+        const generalMatch = trimmedInput.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+        if (generalMatch) {
+            const lat = parseFloat(generalMatch[1]);
+            const lng = parseFloat(generalMatch[2]);
+            if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                return { lat, lng };
+            }
+        }
+
         return null;
     } catch (e) {
-        console.error("Error parsing Google Maps URL:", e);
+        console.error("[GeoUtils] Error parsing input for coordinates:", e);
         return null;
     }
 }

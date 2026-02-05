@@ -11,12 +11,9 @@ from mask_generator import MaskGenerator
 from vehicle_counter import vehicle_counter
 from capacity_estimator import estimate_parking_capacity
 from obb_merger import obb_merger
+from config import settings
 
 logger = logging.getLogger(__name__)
-
-CONFIG = {
-    "tile_size": 256,
-}
 
 
 class PipelineOrchestrator:
@@ -24,10 +21,10 @@ class PipelineOrchestrator:
         self.yolo_detector = YOLODetector()
         self.mask_generator = MaskGenerator(fill_color="#FF0000", alpha=0.4)
         logger.info("[Pipeline] Initialized")
+    
+    # ... (rest of methods)
 
-    def _merge_geo_polygons(self, detections: List[Dict]) -> List[Dict]:
-        if len(detections) <= 1:
-            return detections
+    def _merge_geo_polygons(self, detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
         logger.info(f"[GlobalMerge] Starting global merge on {len(detections)} detections")
 
@@ -160,7 +157,13 @@ class PipelineOrchestrator:
         yield {"type": "log", "message": f"[Step 1/5] Initialized analysis for {total_tiles} tiles"}
         yield {"type": "progress", "value": 0}
 
+        import asyncio
+        loop = asyncio.get_running_loop()
+        
         for idx, tile in enumerate(tiles):
+            # Check for cancellation at the start of each tile
+            await asyncio.sleep(0)
+            
             try:
                 image = self._decode_image(tile["image_base64"])
                 tile_idx = tile["tile_index"]
@@ -168,8 +171,8 @@ class PipelineOrchestrator:
 
                 yield {"type": "log", "message": f"[Tile {idx+1}/{total_tiles}] Starting YOLO detection..."}
 
-                # YOLO Detection
-                detections = self.yolo_detector.detect_parking_spaces(image, confidence)
+                # YOLO Detection (Offloaded to executor)
+                detections = await loop.run_in_executor(None, self.yolo_detector.detect_parking_spaces, image, confidence)
                 yield {"type": "log", "message": f"[Tile {idx+1}] YOLO found {len(detections)} parking spaces"}
 
                 # Merge overlapping OBB detections
@@ -189,8 +192,14 @@ class PipelineOrchestrator:
                 total_vehicles = 0
 
                 for det_idx, det in enumerate(detections):
+                    # Check for cancellation inside the vehicle counting loop
+                    await asyncio.sleep(0)
+                    
                     cropped = self._crop_from_bbox(image, det["bbox"])
-                    vehicle_result = vehicle_counter.count_vehicles(cropped, confidence_threshold=0.5)
+                    
+                    # Vehicle Counting (Offloaded to executor)
+                    vehicle_result = await loop.run_in_executor(None, vehicle_counter.count_vehicles, cropped, 0.5)
+                    
                     vehicle_count = vehicle_result["count"]
                     total_vehicles += vehicle_count
 

@@ -8,6 +8,8 @@ import {
     calculateCenterGrid,
     calculateTileGrid,
     getGoogleSatelliteTileUrl,
+    getPDOKTileUrl,
+    getTileUrl,
     MergedCenter
 } from './geoUtils';
 import { TileBounds, TileConfig, MergedTileFetchResult } from '../types';
@@ -22,6 +24,7 @@ export async function fetchGoogleSatelliteTile(
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
+        // We use fetch here which requires CORS support from the server
         const response = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
 
@@ -69,11 +72,39 @@ async function fetchAndMerge6x6Grid(centerLat: number, centerLng: number): Promi
     bounds: TileBounds;
     centerInfo: MergedCenter;
 }> {
-    const { tiles, centerTile } = calculateTileGrid(centerLat, centerLng, SOURCE_TILES_PER_MERGED, SOURCE_TILES_PER_MERGED);
+    // Use the default high-res ZOOM_LEVEL (21) as primary
+    const { tiles, centerTile } = calculateTileGrid(centerLat, centerLng, SOURCE_TILES_PER_MERGED, SOURCE_TILES_PER_MERGED, ZOOM_LEVEL);
 
-    const images: (HTMLImageElement | null)[] = await Promise.all(
-        tiles.map(tile => fetchGoogleSatelliteTile(tile.url, TIMEOUT_MS))
-    );
+    const images: (HTMLImageElement | null)[] = [];
+    
+    // Sequential fetch with sleep to avoid rate limits
+    for (const tile of tiles) {
+        let img: HTMLImageElement | null = null;
+        
+        // 1. Try Google (Primary)
+        try {
+            const googleUrl = getGoogleSatelliteTileUrl(tile.x, tile.y, ZOOM_LEVEL);
+            img = await fetchGoogleSatelliteTile(googleUrl, TIMEOUT_MS);
+        } catch (e) {
+            // Ignore, try fallback
+        }
+
+        // 2. Fallback to PDOK if Google failed
+        if (!img) {
+            try {
+                // Note: PDOK at Z21 might not be available or might be upscaled, but we try it as fallback
+                const pdokUrl = getPDOKTileUrl(tile.x, tile.y, ZOOM_LEVEL);
+                img = await fetchGoogleSatelliteTile(pdokUrl, TIMEOUT_MS);
+            } catch (e) {
+                console.warn(`Tile ${tile.x},${tile.y} failed both Google and PDOK`);
+            }
+        }
+
+        images.push(img);
+        
+        // Sleep 100ms between tiles
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
 
     const mergedCanvas = document.createElement('canvas');
     mergedCanvas.width = MERGED_SIZE;
@@ -90,8 +121,8 @@ async function fetchAndMerge6x6Grid(centerLat: number, centerLng: number): Promi
         });
     }
 
-    const bounds = getGoogleSatelliteTileBounds(centerTile.x, centerTile.y);
-    const centerInfo = calculateCenterGrid(centerLat, centerLng, 1, 1)[0];
+    const bounds = getGoogleSatelliteTileBounds(centerTile.x, centerTile.y, ZOOM_LEVEL);
+    const centerInfo = calculateCenterGrid(centerLat, centerLng, 1, 1, 4.8, ZOOM_LEVEL)[0];
 
     return {
         mergedUrl: mergedCanvas.toDataURL('image/jpeg', 0.9),
@@ -102,7 +133,8 @@ async function fetchAndMerge6x6Grid(centerLat: number, centerLng: number): Promi
 
 function getGoogleSatelliteTileBounds(
     centerTileX: number,
-    centerTileY: number
+    centerTileY: number,
+    zoom: number = ZOOM_LEVEL
 ): TileBounds {
     const tileCount = SOURCE_TILES_PER_MERGED;
     const offset = Math.floor(tileCount / 2);
@@ -113,7 +145,7 @@ function getGoogleSatelliteTileBounds(
     const maxTileY = minTileY + tileCount;
 
     function tileXYToLatLng(x: number, y: number): { lat: number; lng: number } {
-        const n = 2.0 ** ZOOM_LEVEL;
+        const n = 2.0 ** zoom;
         const lng = x / n * 360.0 - 180.0;
         const latRad = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n)));
         const lat = latRad * (180.0 / Math.PI);

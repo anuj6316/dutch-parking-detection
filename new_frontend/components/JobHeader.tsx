@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, RefreshCw, Download, RotateCcw, PenTool, List, MapPin, Settings } from 'lucide-react';
+import { ChevronRight, RefreshCw, Download, RotateCcw, PenTool, List, MapPin, Settings, X } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
 export interface Area {
@@ -10,6 +10,7 @@ export interface Area {
 
 interface JobHeaderProps {
     onRerun: () => void;
+    onTerminate?: () => void;
     isAnalyzing: boolean;
     onBack: () => void;
     areas: Area[];
@@ -19,6 +20,7 @@ interface JobHeaderProps {
     setDetectionConfidence: (confidence: number) => void;
     useCustomArea: boolean;
     onToggleCustomArea: () => void;
+    onEditCustomArea?: () => void;
     customAreaName?: string;
     totalImages: number;
     setTotalImages: (count: number) => void;
@@ -26,6 +28,7 @@ interface JobHeaderProps {
 
 const JobHeader: React.FC<JobHeaderProps> = ({
     onRerun,
+    onTerminate,
     isAnalyzing,
     onBack,
     areas,
@@ -35,6 +38,7 @@ const JobHeader: React.FC<JobHeaderProps> = ({
     setDetectionConfidence,
     useCustomArea,
     onToggleCustomArea,
+    onEditCustomArea,
     customAreaName,
     totalImages,
     setTotalImages
@@ -90,10 +94,10 @@ const JobHeader: React.FC<JobHeaderProps> = ({
                                 <List size={12} /> Predefined
                             </button>
                             <button 
-                                onClick={() => !useCustomArea && onToggleCustomArea()}
+                                onClick={() => useCustomArea ? onEditCustomArea?.() : onToggleCustomArea()}
                                 className={`flex items-center gap-2 px-4 py-1 rounded-full text-[10px] font-bold transition-all uppercase tracking-wider ${useCustomArea ? 'bg-primary text-white shadow-lg' : 'text-text-muted hover:text-white'}`}
                             >
-                                <PenTool size={12} /> Custom Area
+                                <PenTool size={12} /> {useCustomArea ? 'Edit Area' : 'Custom Area'}
                             </button>
                         </div>
 
@@ -214,13 +218,21 @@ const JobHeader: React.FC<JobHeaderProps> = ({
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button 
-                        onClick={onRerun} 
-                        className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-primary/30 transition-all"
-                    >
-                        <RefreshCw size={16} className={isAnalyzing ? 'animate-spin' : ''} />
-                        Run Analysis
-                    </button>
+                    {isAnalyzing ? (
+                        <button 
+                            onClick={onTerminate} 
+                            className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-500 px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-red-500/20 transition-all"
+                        >
+                            <X size={16} /> Terminate
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={onRerun} 
+                            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-primary/30 transition-all"
+                        >
+                            <RefreshCw size={16} /> Run Analysis
+                        </button>
+                    )}
                     <button 
                         className="flex items-center gap-2 bg-[#1c2128] border border-card-border text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-white/5 transition-all"
                     >

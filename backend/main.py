@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from typing import List, Dict, Any
 from pydantic import BaseModel
 import logging
@@ -6,15 +6,11 @@ import asyncio
 import os
 import base64
 import json
-from pathlib import Path
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from dotenv import load_dotenv
-env_path = Path(__file__).parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
-
+from config import settings
 from pipeline import PipelineOrchestrator
 
 logging.basicConfig(
@@ -24,9 +20,8 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-raw_origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
 origins = []
-for o in raw_origins:
+for o in settings.ALLOWED_ORIGINS:
     o = o.strip().rstrip("/")
     if o:
         origins.append(o)
@@ -44,6 +39,32 @@ app.add_middleware(
 pipeline = PipelineOrchestrator()
 
 
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, WebSocket] = {}
+
+    async def connect(self, job_id: str, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections[job_id] = websocket
+        logger.info(f"[WS] Connected job_id: {job_id}")
+
+    def disconnect(self, job_id: str):
+        if job_id in self.active_connections:
+            del self.active_connections[job_id]
+            logger.info(f"[WS] Disconnected job_id: {job_id}")
+
+    async def send_log(self, job_id: str, message: Dict):
+        if job_id in self.active_connections:
+            try:
+                await self.active_connections[job_id].send_json(message)
+            except Exception as e:
+                logger.error(f"[WS] Error sending log to {job_id}: {e}")
+                self.disconnect(job_id)
+
+manager = ConnectionManager()
+active_tasks: Dict[str, asyncio.Task] = {}
+
+
 class TilePayload(BaseModel):
     image_base64: str
     tile_index: int
@@ -54,51 +75,84 @@ class TileAnalysisRequest(BaseModel):
     tiles: List[TilePayload]
     confidence_threshold: float = 0.25
     count_vehicles: bool = True
+    job_id: str = "default"  # Optional for legacy calls
+
+
+@app.post("/cancel-analysis/{job_id}")
+async def cancel_analysis(job_id: str):
+    """Terminate a running analysis task."""
+    if job_id in active_tasks:
+        task = active_tasks[job_id]
+        task.cancel()
+        logger.info(f"[API] Cancelled task for job_id: {job_id}")
+        return {"status": "cancelled", "job_id": job_id}
+    else:
+        logger.warning(f"[API] No active task found for job_id: {job_id}")
+        return {"status": "not_found", "job_id": job_id}
+
+
+@app.websocket("/ws/logs/{job_id}")
+async def websocket_logs(websocket: WebSocket, job_id: str):
+    await manager.connect(job_id, websocket)
+    try:
+        while True:
+            # Keep connection open
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(job_id)
+    except Exception as e:
+        logger.error(f"[WS] Error in logs socket: {e}")
+        manager.disconnect(job_id)
 
 
 @app.post("/analyze-tiles/")
 async def analyze_tiles(request: TileAnalysisRequest):
-    """Legacy sequential endpoint (returns all at once)."""
-    logger.info(f"[API] Received {len(request.tiles)} tiles (Sequential)")
+    """
+    Standard HTTP endpoint for analysis. 
+    If 'job_id' is provided, streams logs to the connected WebSocket.
+    """
+    job_id = request.job_id
+    logger.info(f"[API] Received {len(request.tiles)} tiles (Job: {job_id})")
     
     tiles_data = [
         {"image_base64": t.image_base64, "tile_index": t.tile_index, "bounds": t.bounds}
         for t in request.tiles
     ]
     
-    final_result = {}
-    async for update in pipeline.run(tiles_data, request.confidence_threshold):
-        if update["type"] == "final_result":
-            final_result = update["data"]
-    
-    return final_result
+    async def run_pipeline():
+        # Define a callback to push logs to WebSocket
+        async def log_callback(update):
+            if job_id:
+                await manager.send_log(job_id, update)
 
-
-@app.post("/analyze-tiles-stream/")
-async def analyze_tiles_stream(request: TileAnalysisRequest):
-    """Streaming endpoint for real-time progress and logs."""
-    logger.info(f"[API] Received {len(request.tiles)} tiles (Streaming)")
-
-    tiles_data = [
-        {"image_base64": t.image_base64, "tile_index": t.tile_index, "bounds": t.bounds}
-        for t in request.tiles
-    ]
-
-    async def event_generator():
-        # Yield an initial message to immediately open the connection and send headers
-        yield json.dumps({"type": "log", "message": "Connection established. Starting analysis..."}) + "\n"
-        
+        final_result = {}
         try:
+            # Run pipeline with log callback
             async for update in pipeline.run(tiles_data, request.confidence_threshold):
-                yield json.dumps(update) + "\n"
-        except Exception as e:
-            logger.error(f"Error in event_generator: {e}")
-            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+                await log_callback(update)
+                if update["type"] == "final_result":
+                    final_result = update["data"]
+            return final_result
+        except asyncio.CancelledError:
+            logger.info(f"[Task] Job {job_id} was cancelled internally")
+            await manager.send_log(job_id, {"type": "log", "message": "⚠️ Analysis terminated by user."})
+            await manager.send_log(job_id, {"type": "error", "message": "Job terminated."})
+            raise
+        finally:
+            if job_id in active_tasks:
+                del active_tasks[job_id]
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="application/x-ndjson"
-    )
+    # Create and track the task
+    task = asyncio.create_task(run_pipeline())
+    active_tasks[job_id] = task
+    
+    try:
+        return await task
+    except asyncio.CancelledError:
+        raise HTTPException(status_code=499, detail="Client Closed Request / Job Cancelled")
+    except Exception as e:
+        logger.error(f"[API] Error in job {job_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/")
@@ -111,9 +165,7 @@ def health_check():
     return {"status": "healthy", "pipeline": "modular"}
 
 
-SAVE_DIR = Path(
-    "./public/merged-images"
-)
+SAVE_DIR = settings.SAVE_DIR
 
 
 class SaveImagesRequest(BaseModel):

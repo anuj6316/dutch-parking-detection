@@ -43,6 +43,7 @@ const MapSection: React.FC<MapSectionProps> = ({
     const bgtLayerRef = useRef<L.TileLayer.WMS | null>(null);
     const boundaryLayerRef = useRef<L.GeoJSON | null>(null);
 
+    const [mapReady, setMapReady] = useState(false);
     const [baseLayer, setBaseLayer] = useState<'pdok' | 'google'>('google');
     const [showBGT, setShowBGT] = useState(false);
     const [showGrid, setShowGrid] = useState(true);
@@ -63,32 +64,40 @@ const MapSection: React.FC<MapSectionProps> = ({
 
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+        // Add default base layer immediately
+        L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            minZoom: 1, maxZoom: 22, attribution: 'Google'
+        }).addTo(map);
+
         mapInstanceRef.current = map;
         markersLayerRef.current = L.layerGroup().addTo(map);
         gridLayerRef.current = L.layerGroup().addTo(map);
         tilesLayerRef.current = L.layerGroup().addTo(map);
 
         map.fitBounds([[bounds.minLat, bounds.minLng], [bounds.maxLat, bounds.maxLng]]);
+        
+        setMapReady(true);
 
         return () => {
             map.remove();
             mapInstanceRef.current = null;
+            setMapReady(false);
         };
     }, []);
 
     // Update map view when center or bounds change
     useEffect(() => {
-        if (!mapInstanceRef.current) return;
+        if (!mapReady || !mapInstanceRef.current) return;
         
         mapInstanceRef.current.flyTo([center.lat, center.lng], 19);
         
         // Optionally fit bounds if they change significantly, but flyTo is usually sufficient for centering
         // mapInstanceRef.current.fitBounds([[bounds.minLat, bounds.minLng], [bounds.maxLat, bounds.maxLng]]);
-    }, [center.lat, center.lng]);
+    }, [center.lat, center.lng, mapReady]);
 
     // Render Municipality Polygon
     useEffect(() => {
-        if (!mapInstanceRef.current) return;
+        if (!mapReady || !mapInstanceRef.current) return;
         const map = mapInstanceRef.current;
 
         if (boundaryLayerRef.current) {
@@ -133,11 +142,11 @@ const MapSection: React.FC<MapSectionProps> = ({
             // Optionally fit bounds to the municipality polygon
             // map.fitBounds(boundaryLayerRef.current.getBounds());
         }
-    }, [municipalityPolygon]);
+    }, [municipalityPolygon, mapReady]);
 
     // Handle Base Layer Toggle
     useEffect(() => {
-        if (!mapInstanceRef.current) return;
+        if (!mapReady || !mapInstanceRef.current) return;
         const map = mapInstanceRef.current;
 
         map.eachLayer((layer) => {
@@ -157,11 +166,11 @@ const MapSection: React.FC<MapSectionProps> = ({
                 minZoom: 1, maxZoom: 22, attribution: 'Google'
             }).addTo(map);
         }
-    }, [baseLayer]);
+    }, [baseLayer, mapReady]);
 
     // Render Tile Grid and AI Images Mosaic
     useEffect(() => {
-        if (!mapInstanceRef.current || !gridLayerRef.current || !tilesLayerRef.current) return;
+        if (!mapReady || !mapInstanceRef.current || !gridLayerRef.current || !tilesLayerRef.current) return;
         const map = mapInstanceRef.current;
         gridLayerRef.current.clearLayers();
         tilesLayerRef.current.clearLayers();
@@ -209,11 +218,11 @@ const MapSection: React.FC<MapSectionProps> = ({
                 color: '#3b82f6', weight: 1, fill: false, dashArray: '5, 5', opacity: 0.3
             }).addTo(gridLayerRef.current!);
         }
-    }, [tileConfigs, tileImages, showGrid, showTileMosaic, bounds]);
+    }, [tileConfigs, tileImages, showGrid, showTileMosaic, bounds, mapReady]);
 
     // Handle BGT Layer Toggle
     useEffect(() => {
-        if (!mapInstanceRef.current) return;
+        if (!mapReady || !mapInstanceRef.current) return;
         const map = mapInstanceRef.current;
         if (showBGT) {
             bgtLayerRef.current = L.tileLayer.wms('https://service.pdok.nl/lv/bgt/wms/v1_0', {
@@ -223,11 +232,11 @@ const MapSection: React.FC<MapSectionProps> = ({
             map.removeLayer(bgtLayerRef.current);
             bgtLayerRef.current = null;
         }
-    }, [showBGT]);
+    }, [showBGT, mapReady]);
 
     // Render Spaces and Spotlight Mask
     useEffect(() => {
-        if (!mapInstanceRef.current || !markersLayerRef.current) return;
+        if (!mapReady || !mapInstanceRef.current || !markersLayerRef.current) return;
         const map = mapInstanceRef.current;
         markersLayerRef.current.clearLayers();
         if (maskLayerRef.current) { map.removeLayer(maskLayerRef.current); maskLayerRef.current = null; }
@@ -246,14 +255,14 @@ const MapSection: React.FC<MapSectionProps> = ({
         spaces.forEach(space => {
             if (!space.geoPolygon) return;
             const isActive = activeSpaceId === space.id;
-            const color = '#3fb950';
+            const color = isActive ? '#ef4444' : '#3fb950';
 
             const polygon = L.polygon(space.geoPolygon, {
                 color: color,
-                weight: isActive ? 3 : 1.5,
-                opacity: 0.9,
+                weight: isActive ? 4 : 1.5,
+                opacity: 1.0,
                 fillColor: color,
-                fillOpacity: isActive ? 0.3 : 0.45,
+                fillOpacity: isActive ? 0.25 : 0.45,
                 className: `cursor-pointer ${isActive ? 'active-space' : ''}`
             });
 
@@ -269,7 +278,7 @@ const MapSection: React.FC<MapSectionProps> = ({
                 map.flyTo(polyBounds.getCenter(), 21, { animate: true });
             }
         });
-    }, [spaces, activeSpaceId, useSpotlight, onSpaceClick]);
+    }, [spaces, activeSpaceId, useSpotlight, onSpaceClick, mapReady]);
 
     return (
         <div className="lg:col-span-2 rounded-xl bg-card border border-card-border overflow-hidden flex flex-col h-full min-h-[550px] shadow-lg relative group">

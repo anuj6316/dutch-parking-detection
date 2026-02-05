@@ -38,6 +38,20 @@ export const analyzeTiles = async (data: AnalysisRequest): Promise<AnalysisRespo
   }
 };
 
+export const analyzeTilesStream = async (data: AnalysisRequest): Promise<Response> => {
+    const response = await fetch(API_ENDPOINTS.ANALYZE_TILES_STREAM, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Analysis failed: ${response.status}`);
+    }
+    
+    return response;
+};
+
 export const checkHealth = async (): Promise<{ status: string }> => {
   try {
     const response = await fetch(API_ENDPOINTS.HEALTH, {

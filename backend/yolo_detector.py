@@ -1,31 +1,22 @@
-import os
 import logging
 from ultralytics import YOLO
 from PIL import Image
 from typing import List, Dict, Any
-from dotenv import load_dotenv
+from config import settings
 
 logger = logging.getLogger(__name__)
-load_dotenv()
-
-MODEL_PATH = os.getenv("MODEL_PATH")
-if not MODEL_PATH:
-    MODEL_PATH = "/app/yolo26s-obb-heavy-aug6/weights/best.pt"
-    logger.info(f"Using default Model Path: {MODEL_PATH}")
-else:
-    logger.info(f"Model Path loaded from environment: {MODEL_PATH}")
 
 class YOLODetector:
     def __init__(
         self,
-        model_path: str = MODEL_PATH,
+        model_path: str = settings.MODEL_PATH,
     ):
         self.model = YOLO(model_path)
         logger.info(f"[YOLO] Loaded model from {model_path}")
 
     def detect_parking_spaces(
         self, image: Image.Image, confidence: float = 0.25
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:  # sourcery skip: low-code-quality
         """Detect parking spaces using YOLO with explicit .predict() pattern."""
         results = self.model.predict(
             source=image,

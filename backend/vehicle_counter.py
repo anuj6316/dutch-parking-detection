@@ -17,18 +17,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from PIL import Image, ImageDraw
 import numpy as np
-# from config import MODEL_PATH, SKIP_SAM3_MODEL
+from config import settings
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
-
-# Load environment
-from dotenv import load_dotenv
-
-env_path = Path(__file__).parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
 
 # Get HuggingFace token for gated models
 HF_TOKEN = os.environ.get("HF_API_KEY") or os.environ.get("HF_TOKEN")
@@ -44,18 +38,15 @@ except Exception as e:
     logging.exception(f"Error during HuggingFace login: {e}")
 
 # Skip SAM3 loading for faster testing - set to True to enable
-try:
-    SKIP_SAM3_LOADING = False
-    logging.info(f"skip sam3 model--> {SKIP_SAM3_LOADING}")
-except Exception as e:
-    logging.error(f"SKIP_SAM3_LOADING is encounter some error {e}")
+SKIP_SAM3_LOADING = settings.SKIP_SAM3_LOADING
+logging.info(f"skip sam3 model--> {SKIP_SAM3_LOADING}")
     
 
 # Check SAM3 availability (primary - most accurate)
 SAM3_AVAILABLE = False
 sam3_model = None
 sam3_processor = None
-device = "gpu"
+# device = "gpu"
 
 if not SKIP_SAM3_LOADING:
     logging.info(f"SKIP_SAM3_LOADING: {SKIP_SAM3_LOADING}")
@@ -150,7 +141,7 @@ class VehicleCounter:
         self._init_fallback_models()
 
         if SAM3_AVAILABLE:
-            logger.info(f"[VehicleCounter] SAM3 available locally")
+            logger.info("[VehicleCounter] SAM3 available locally")
         elif COLAB_AVAILABLE:
             logger.info(
                 f"[VehicleCounter] SAM3 Colab Proxy available at {COLAB_PROXY_URL}"
@@ -494,18 +485,22 @@ class VehicleCounter:
             }
 
         except Exception as e:
-            logger.error(f"[SAM3] Error: {e}")
-            import traceback
+            return self._extracted_from__count_with_sam3_96(e, image, confidence_threshold)
 
-            traceback.print_exc()
+    # TODO Rename this here and in `_count_with_sam3`
+    def _extracted_from__count_with_sam3_96(self, e, image, confidence_threshold):
+        logger.error(f"[SAM3] Error: {e}")
+        import traceback
 
-            if YOLO_AVAILABLE and self.yolo_model is None:
-                self._init_fallback_models()
-            if self.yolo_model is not None:
-                logger.info("[SAM3] Falling back to YOLO...")
-                return self._count_with_yolo(image, confidence_threshold)
+        traceback.print_exc()
 
-            return {"count": 0, "detections": [], "source": "error", "error": str(e)}
+        if YOLO_AVAILABLE and self.yolo_model is None:
+            self._init_fallback_models()
+        if self.yolo_model is not None:
+            logger.info("[SAM3] Falling back to YOLO...")
+            return self._count_with_yolo(image, confidence_threshold)
+
+        return {"count": 0, "detections": [], "source": "error", "error": str(e)}
 
     def _count_with_yolo(
         self, image: Image.Image, confidence_threshold: float
@@ -587,96 +582,99 @@ class VehicleCounter:
     ) -> Optional[str]:
         """Create overlay with SAM3 masks and bounding boxes."""
         try:
-            import matplotlib
-
-            # Convert to RGBA for overlay
-            overlay = image.convert("RGBA")
-
-            # Overlay masks with rainbow colors
-            if hasattr(masks, "__len__") and len(masks) > 0:
-                masks_np = (
-                    masks.cpu().numpy() if hasattr(masks, "cpu") else np.array(masks)
-                )
-                n_masks = masks_np.shape[0] if len(masks_np.shape) > 2 else 1
-
-                cmap = matplotlib.colormaps.get_cmap("rainbow").resampled(
-                    max(n_masks, 1)
-                )
-
-                for i in range(n_masks):
-                    mask = masks_np[i] if n_masks > 1 else masks_np
-                    mask_uint8 = (mask * 255).astype(np.uint8)
-
-                    # Get color from colormap
-                    color = tuple(
-                        int(c * 255) for c in cmap(i / max(n_masks - 1, 1))[:3]
-                    )
-
-                    # Squeeze to ensure 2D (H, W)
-                    if mask_uint8.ndim > 2:
-                        mask_uint8 = mask_uint8.squeeze()
-
-                    # Create colored overlay
-                    mask_img = Image.fromarray(mask_uint8, mode="L")
-                    color_overlay = Image.new("RGBA", image.size, color + (0,))
-                    alpha = mask_img.point(lambda v: int(v * 0.5))
-                    color_overlay.putalpha(alpha)
-                    overlay = Image.alpha_composite(overlay, color_overlay)
-
-            # Convert back to RGB and draw boxes
-            overlay_rgb = overlay.convert("RGB")
-            draw = ImageDraw.Draw(overlay_rgb)
-
-            for box_data in boxes:
-                # Handle both old 3-tuple and new 4-tuple format
-                if len(box_data) == 4:
-                    xyxy, conf, cls, is_complete = box_data
-                else:
-                    xyxy, conf, cls = box_data
-                    is_complete = True
-
-                x1, y1, x2, y2 = int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])
-
-                # Green for complete vehicles, orange dashed for cut-off
-                if is_complete:
-                    color = "#22c55e"  # Green
-                    label = f"{cls} {conf:.0%}"
-                else:
-                    color = "#f97316"  # Orange
-                    label = f"{cls} {conf:.0%} (cut)"
-
-                # Draw box
-                draw.rectangle(
-                    [x1, y1, x2, y2], outline=color, width=3 if is_complete else 2
-                )
-
-                # Draw label
-                try:
-                    text_bbox = draw.textbbox((x1, y1 - 18), label)
-                    draw.rectangle(
-                        [
-                            text_bbox[0] - 2,
-                            text_bbox[1] - 2,
-                            text_bbox[2] + 2,
-                            text_bbox[3] + 2,
-                        ],
-                        fill=color,
-                    )
-                    draw.text((x1, y1 - 18), label, fill="white")
-                except:
-                    draw.text((x1, y1 - 18), label, fill=color)
-
-            # Convert to base64
-            buf = io.BytesIO()
-            overlay_rgb.save(buf, format="JPEG", quality=85)
-            return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
-
+            return self._extracted_from__create_sam3_overlay_6(image, masks, boxes)
         except Exception as e:
             logger.error(f"[SAM3] Overlay error: {e}")
             import traceback
 
             traceback.print_exc()
             return None
+
+    # TODO Rename this here and in `_create_sam3_overlay`
+    def _extracted_from__create_sam3_overlay_6(self, image, masks, boxes):
+        import matplotlib
+
+        # Convert to RGBA for overlay
+        overlay = image.convert("RGBA")
+
+        # Overlay masks with rainbow colors
+        if hasattr(masks, "__len__") and len(masks) > 0:
+            masks_np = (
+                masks.cpu().numpy() if hasattr(masks, "cpu") else np.array(masks)
+            )
+            n_masks = masks_np.shape[0] if len(masks_np.shape) > 2 else 1
+
+            cmap = matplotlib.colormaps.get_cmap("rainbow").resampled(
+                max(n_masks, 1)
+            )
+
+            for i in range(n_masks):
+                mask = masks_np[i] if n_masks > 1 else masks_np
+                mask_uint8 = (mask * 255).astype(np.uint8)
+
+                # Get color from colormap
+                color = tuple(
+                    int(c * 255) for c in cmap(i / max(n_masks - 1, 1))[:3]
+                )
+
+                # Squeeze to ensure 2D (H, W)
+                if mask_uint8.ndim > 2:
+                    mask_uint8 = mask_uint8.squeeze()
+
+                # Create colored overlay
+                mask_img = Image.fromarray(mask_uint8, mode="L")
+                color_overlay = Image.new("RGBA", image.size, color + (0,))
+                alpha = mask_img.point(lambda v: int(v * 0.5))
+                color_overlay.putalpha(alpha)
+                overlay = Image.alpha_composite(overlay, color_overlay)
+
+        # Convert back to RGB and draw boxes
+        overlay_rgb = overlay.convert("RGB")
+        draw = ImageDraw.Draw(overlay_rgb)
+
+        for box_data in boxes:
+            # Handle both old 3-tuple and new 4-tuple format
+            if len(box_data) == 4:
+                xyxy, conf, cls, is_complete = box_data
+            else:
+                xyxy, conf, cls = box_data
+                is_complete = True
+
+            x1, y1, x2, y2 = int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])
+
+            # Green for complete vehicles, orange dashed for cut-off
+            if is_complete:
+                color = "#22c55e"  # Green
+                label = f"{cls} {conf:.0%}"
+            else:
+                color = "#f97316"  # Orange
+                label = f"{cls} {conf:.0%} (cut)"
+
+            # Draw box
+            draw.rectangle(
+                [x1, y1, x2, y2], outline=color, width=3 if is_complete else 2
+            )
+
+            # Draw label
+            try:
+                text_bbox = draw.textbbox((x1, y1 - 18), label)
+                draw.rectangle(
+                    [
+                        text_bbox[0] - 2,
+                        text_bbox[1] - 2,
+                        text_bbox[2] + 2,
+                        text_bbox[3] + 2,
+                    ],
+                    fill=color,
+                )
+                draw.text((x1, y1 - 18), label, fill="white")
+            except:
+                draw.text((x1, y1 - 18), label, fill=color)
+
+        # Convert to base64
+        buf = io.BytesIO()
+        overlay_rgb.save(buf, format="JPEG", quality=85)
+        return f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
     def _create_yolo_overlay(self, image: Image.Image, boxes: List) -> Optional[str]:
         """Create overlay with YOLO detection boxes."""
@@ -725,7 +723,7 @@ class VehicleCounter:
 
             buf = io.BytesIO()
             overlay.save(buf, format="JPEG", quality=85)
-            return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+            return f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
         except Exception as e:
             logger.error(f"[YOLO] Overlay error: {e}")

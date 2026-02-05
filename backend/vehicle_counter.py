@@ -188,394 +188,210 @@ class VehicleCounter:
         self, image: Image.Image, confidence_threshold: float = 0.3, prompt: str = "car"
     ) -> Dict[str, Any]:
         """
-        Count vehicles in the image using SAM3 (Local/Proxy) or YOLO.
+        Count vehicles in a single image (Wrapper for batch processing).
         """
-        # 1. Try Colab Proxy first if we are on CPU (it's much faster)
+        results = self.count_vehicles_batch([image], confidence_threshold, prompt)
+        return results[0] if results else {
+            "count": 0,
+            "detections": [],
+            "source": "error",
+            "error": "Batch processing returned empty",
+        }
+
+    def count_vehicles_batch(
+        self, images: List[Image.Image], confidence_threshold: float = 0.3, prompt: str = "car"
+    ) -> List[Dict[str, Any]]:
+        """
+        Count vehicles in a batch of images using SAM3 (Local/Proxy) or YOLO.
+        """
+        if not images:
+            return []
+
+        # 1. Try Colab Proxy (Not implemented for batch yet, fallback to loop or local)
         if COLAB_AVAILABLE and "cuda" not in self.device:
-            return self._count_with_colab_proxy(image, confidence_threshold, prompt)
+            # Fallback to sequential for proxy if batching isn't supported there
+            return [self._count_with_colab_proxy(img, confidence_threshold, prompt) for img in images]
 
         # 2. Try Local SAM3
         if SAM3_AVAILABLE and self.sam3_model is not None:
-            return self._count_with_sam3(image, confidence_threshold, prompt)
+            return self._count_batch_with_sam3(images, confidence_threshold, prompt)
 
-        # 3. Try Colab Proxy as secondary if local failed
-        if COLAB_AVAILABLE:
-            return self._count_with_colab_proxy(image, confidence_threshold, prompt)
-
-        # 4. Fallback to YOLO
+        # 3. Fallback to YOLO
         if YOLO_AVAILABLE:
             if self.yolo_model is None:
                 self._init_fallback_models()
             if self.yolo_model is not None:
-                return self._count_with_yolo(image, confidence_threshold)
+                return self._count_batch_with_yolo(images, confidence_threshold)
 
-        return {
+        # Error case
+        return [{
             "count": 0,
             "detections": [],
             "source": "error",
             "error": "No model available",
-        }
+        } for _ in images]
 
-    def _count_with_colab_proxy(
-        self, image: Image.Image, threshold: float, prompt: str
-    ) -> Dict[str, Any]:
-        """Call remote SAM3 API via Gradio Proxy."""
-        import requests
-
-        try:
-            # Convert PIL to bytes
-            buf = io.BytesIO()
-            image.save(buf, format="JPEG")
-            img_bytes = buf.getvalue()
-
-            files = {"file": ("image.jpg", img_bytes, "image/jpeg")}
-            params = {"prompt": prompt, "threshold": threshold}
-
-            resp = requests.post(
-                f"{self.colab_url.rstrip('/')}/detect",
-                files=files,
-                params=params,
-                timeout=30,
-            )
-            if resp.status_code == 200:
-                result = resp.json()
-                result["source"] = "sam3-proxy"
-                return result
-            else:
-                logger.error(f"[ColabProxy] Error: {resp.text}")
-                return (
-                    self._count_with_sam3(image, threshold, prompt)
-                    if SAM3_AVAILABLE
-                    else {"count": 0, "detections": []}
-                )
-        except Exception as e:
-            logger.error(f"[ColabProxy] Failed: {e}")
-            return (
-                self._count_with_sam3(image, threshold, prompt)
-                if SAM3_AVAILABLE
-                else {"count": 0, "detections": []}
-            )
-
-    def detect_parking_spaces(
-        self,
-        image: Image.Image,
-        confidence_threshold: float = 0.25,
-        prompt: str = "parking space",
+    def _count_batch_with_sam3(
+        self, images: List[Image.Image], confidence_threshold: float, prompt: str
     ) -> List[Dict[str, Any]]:
-        """
-        Detect parking spaces using SAM3 text prompt.
-
-        Returns:
-            List of detections with 'obb_coordinates', 'confidence', etc.
-        """
-        if not SAM3_AVAILABLE:
-            logger.warning("[VehicleCounter] SAM3 not available for space detection!")
-            return []
-
-        logger.info(
-            f"[SAM3] Running parking space detection (conf={confidence_threshold}, prompt='{prompt}')"
-        )
-
-        try:
-            results = self._detect_with_sam3(image, confidence_threshold, prompt)
-
-            formatted_detections = []
-            for det in results.get("detections", []):
-                box = det["box"]
-                formatted_detections.append(
-                    {
-                        "obb_coordinates": [
-                            box["xmin"],
-                            box["ymin"],
-                            box["xmax"],
-                            box["ymin"],
-                            box["xmax"],
-                            box["ymax"],
-                            box["xmin"],
-                            box["ymax"],
-                        ],
-                        "confidence": [det["confidence"]],
-                    }
-                )
-
-            logger.info(f"[SAM3] Detected {len(formatted_detections)} parking spaces")
-            return formatted_detections
-
-        except Exception as e:
-            logger.error(f"[VehicleCounter] Space detection error: {e}")
-            return []
-
-        try:
-            # Re-using the core SAM3 logic but tailored for the "parking space" concept
-            results = self._detect_with_sam3(image, confidence_threshold, prompt)
-
-            formatted_detections = []
-            for det in results.get("detections", []):
-                box = det["box"]
-                formatted_detections.append(
-                    {
-                        "obb_coordinates": [
-                            box["xmin"],
-                            box["ymin"],
-                            box["xmax"],
-                            box["ymin"],
-                            box["xmax"],
-                            box["ymax"],
-                            box["xmin"],
-                            box["ymax"],
-                        ],
-                        "confidence": [det["confidence"]],
-                    }
-                )
-            return formatted_detections
-
-        except Exception as e:
-            logger.error(f"[VehicleCounter] Space detection error: {e}")
-            return []
-
-    def _detect_with_sam3(
-        self, image: Image.Image, confidence_threshold: float, prompt: str
-    ) -> Dict[str, Any]:
-        """Generic SAM3 detection for any text prompt."""
-        import torch
-
-        if image.mode != "RGB":
-            image = image.convert("RGB")
-
-        inputs = self.sam3_processor(images=image, text=prompt, return_tensors="pt").to(
-            self.device
-        )
-
-        with torch.no_grad():
-            outputs = self.sam3_model(**inputs)
-
-        results = self.sam3_processor.post_process_instance_segmentation(
-            outputs,
-            threshold=confidence_threshold,
-            mask_threshold=0.5,
-            target_sizes=inputs.get("original_sizes").tolist(),
-        )[0]
-
-        masks = results.get("masks", [])
-        boxes = results.get("boxes", [])
-        scores = results.get("scores", [])
-
-        n_detections = len(masks) if hasattr(masks, "__len__") else 0
-        detections = []
-
-        for i in range(n_detections):
-            score = (
-                float(scores[i].cpu())
-                if hasattr(scores[i], "cpu")
-                else float(scores[i])
-            )
-            box = boxes[i].cpu().numpy() if hasattr(boxes[i], "cpu") else boxes[i]
-
-            detections.append(
-                {
-                    "confidence": score,
-                    "box": {
-                        "xmin": float(box[0]),
-                        "ymin": float(box[1]),
-                        "xmax": float(box[2]),
-                        "ymax": float(box[3]),
-                    },
-                }
-            )
-
-        return {
-            "detections": detections,
-            "masks": masks,
-            "boxes": boxes,
-            "scores": scores,
-        }
-
-    def _count_with_sam3(
-        self, image: Image.Image, confidence_threshold: float, prompt: str
-    ) -> Dict[str, Any]:
-        """Count vehicles using SAM3 with text prompt."""
+        """Count vehicles in a batch using SAM3."""
         import torch
 
         try:
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-
-            logger.info(
-                f"[SAM3] Counting vehicles (conf={confidence_threshold}, prompt='{prompt}')"
-            )
+            # Prepare batch inputs
+            rgb_images = [img.convert("RGB") if img.mode != "RGB" else img for img in images]
+            prompts = [prompt] * len(images)
+            
+            logger.info(f"[SAM3] Processing batch of {len(images)} images (prompt='{prompt}')")
 
             inputs = self.sam3_processor(
-                images=image, text=prompt, return_tensors="pt"
+                images=rgb_images, text=prompts, return_tensors="pt", padding=True
             ).to(self.device)
 
             with torch.no_grad():
                 outputs = self.sam3_model(**inputs)
 
-            results = self.sam3_processor.post_process_instance_segmentation(
+            results_list = self.sam3_processor.post_process_instance_segmentation(
                 outputs,
                 threshold=confidence_threshold,
                 mask_threshold=0.5,
                 target_sizes=inputs.get("original_sizes").tolist(),
-            )[0]
+            )
 
-            masks = results.get("masks", [])
-            boxes = results.get("boxes", [])
-            scores = results.get("scores", [])
+            batch_results = []
+            
+            for idx, results in enumerate(results_list):
+                masks = results.get("masks", [])
+                boxes = results.get("boxes", [])
+                scores = results.get("scores", [])
 
-            n_raw_detections = len(masks) if hasattr(masks, "__len__") else 0
-            logger.info(f"[SAM3] Found {n_raw_detections} raw objects")
+                n_raw_detections = len(masks) if hasattr(masks, "__len__") else 0
+                
+                detections = []
+                valid_detections = []
+                boxes_for_overlay = []
+                skipped_cutoff = 0
+                
+                image = rgb_images[idx]
+                img_width, img_height = image.size
 
-            img_width, img_height = image.size
-
-            detections = []
-            valid_detections = []
-            boxes_for_overlay = []
-            skipped_cutoff = 0
-
-            if n_raw_detections > 0:
-                for i in range(n_raw_detections):
-                    score = (
-                        float(scores[i].cpu())
-                        if hasattr(scores[i], "cpu")
-                        else float(scores[i])
-                    )
-                    box = (
-                        boxes[i].cpu().numpy() if hasattr(boxes[i], "cpu") else boxes[i]
-                    )
-
-                    box_dict = {
-                        "xmin": float(box[0]),
-                        "ymin": float(box[1]),
-                        "xmax": float(box[2]),
-                        "ymax": float(box[3]),
-                    }
-
-                    is_complete = self._is_fully_visible(
-                        box_dict, img_width, img_height
-                    )
-
-                    detection = {
-                        "class": prompt,
-                        "confidence": score,
-                        "box": box_dict,
-                        "is_complete": is_complete,
-                    }
-
-                    detections.append(detection)
-                    boxes_for_overlay.append((box, score, prompt, is_complete))
-
-                    if is_complete:
-                        valid_detections.append(detection)
-                    else:
-                        skipped_cutoff += 1
-
-            if skipped_cutoff > 0:
-                logger.info(f"[SAM3] Filtered out {skipped_cutoff} cut-off vehicles")
-
-            count = len(valid_detections)
-            logger.info(f"[SAM3] Counting {count} vehicles")
-
-            overlay_b64 = self._create_sam3_overlay(image, masks, boxes_for_overlay)
-
-            return {
-                "count": count,
-                "detections": detections,
-                "overlay_image": overlay_b64,
-                "source": "sam3",
-            }
-
-        except Exception as e:
-            return self._extracted_from__count_with_sam3_96(e, image, confidence_threshold)
-
-    # TODO Rename this here and in `_count_with_sam3`
-    def _extracted_from__count_with_sam3_96(self, e, image, confidence_threshold):
-        logger.error(f"[SAM3] Error: {e}")
-        import traceback
-
-        traceback.print_exc()
-
-        if YOLO_AVAILABLE and self.yolo_model is None:
-            self._init_fallback_models()
-        if self.yolo_model is not None:
-            logger.info("[SAM3] Falling back to YOLO...")
-            return self._count_with_yolo(image, confidence_threshold)
-
-        return {"count": 0, "detections": [], "source": "error", "error": str(e)}
-
-    def _count_with_yolo(
-        self, image: Image.Image, confidence_threshold: float
-    ) -> Dict[str, Any]:
-        """Fallback: Count vehicles using YOLO."""
-        try:
-            img_np = np.array(image)
-
-            logger.info(f"[YOLO] Running detection (conf={confidence_threshold})...")
-            results = self.yolo_model(img_np, conf=confidence_threshold, verbose=False)
-
-            detections = []
-            boxes = []
-
-            # Get image dimensions for edge detection
-            img_height, img_width = img_np.shape[:2]
-
-            valid_detections = []
-            skipped_cutoff = 0
-
-            if results[0].boxes is not None:
-                for box in results[0].boxes:
-                    cls_id = int(box.cls.cpu().numpy()[0])
-
-                    if cls_id in self.vehicle_classes:
-                        conf = float(box.conf.cpu().numpy()[0])
-                        xyxy = box.xyxy.cpu().numpy()[0]
+                if n_raw_detections > 0:
+                    for i in range(n_raw_detections):
+                        score = float(scores[i].cpu()) if hasattr(scores[i], "cpu") else float(scores[i])
+                        box = boxes[i].cpu().numpy() if hasattr(boxes[i], "cpu") else boxes[i]
 
                         box_dict = {
-                            "xmin": float(xyxy[0]),
-                            "ymin": float(xyxy[1]),
-                            "xmax": float(xyxy[2]),
-                            "ymax": float(xyxy[3]),
+                            "xmin": float(box[0]),
+                            "ymin": float(box[1]),
+                            "xmax": float(box[2]),
+                            "ymax": float(box[3]),
                         }
 
-                        # Check if vehicle is fully visible (not cut off at edges)
-                        is_complete = self._is_fully_visible(
-                            box_dict, img_width, img_height
-                        )
+                        is_complete = self._is_fully_visible(box_dict, img_width, img_height)
 
                         detection = {
-                            "class": self.vehicle_classes[cls_id],
-                            "confidence": conf,
+                            "class": prompt,
+                            "confidence": score,
                             "box": box_dict,
                             "is_complete": is_complete,
                         }
 
                         detections.append(detection)
-                        boxes.append(
-                            (xyxy, conf, self.vehicle_classes[cls_id], is_complete)
-                        )
+                        boxes_for_overlay.append((box, score, prompt, is_complete))
 
                         if is_complete:
                             valid_detections.append(detection)
                         else:
                             skipped_cutoff += 1
 
-            if skipped_cutoff > 0:
-                logger.info(
-                    f"[YOLO] Filtered out {skipped_cutoff} cut-off vehicles at edges"
-                )
-            logger.info(f"[YOLO] Counting {len(valid_detections)} complete vehicles")
+                overlay_b64 = self._create_sam3_overlay(image, masks, boxes_for_overlay)
+                
+                batch_results.append({
+                    "count": len(valid_detections),
+                    "detections": detections,
+                    "overlay_image": overlay_b64,
+                    "source": "sam3",
+                })
 
-            overlay_b64 = self._create_yolo_overlay(image, boxes)
-
-            return {
-                "count": len(valid_detections),  # Only count fully visible vehicles
-                "detections": detections,  # Return all for reference
-                "overlay_image": overlay_b64,
-                "source": "yolo",
-            }
+            return batch_results
 
         except Exception as e:
-            logger.error(f"[YOLO] Error: {e}")
-            return {"count": 0, "detections": [], "source": "error", "error": str(e)}
+            logger.error(f"[SAM3] Batch Error: {e}")
+            # Fallback to YOLO if SAM3 fails
+            if YOLO_AVAILABLE:
+                 return self._count_batch_with_yolo(images, confidence_threshold)
+            return [{"count": 0, "detections": [], "source": "error", "error": str(e)} for _ in images]
+
+    def _count_batch_with_yolo(
+        self, images: List[Image.Image], confidence_threshold: float
+    ) -> List[Dict[str, Any]]:
+        """Count vehicles in a batch using YOLO."""
+        import numpy as np
+        
+        try:
+            # Convert all to list of numpy arrays
+            img_list = [np.array(img) for img in images]
+            
+            logger.info(f"[YOLO] Running batch detection on {len(images)} images...")
+            results_list = self.yolo_model(img_list, conf=confidence_threshold, verbose=False)
+            
+            batch_outputs = []
+            
+            for idx, result in enumerate(results_list):
+                detections = []
+                boxes_overlay = []
+                
+                img_height, img_width = img_list[idx].shape[:2]
+                valid_detections = []
+                skipped_cutoff = 0
+
+                if result.boxes is not None:
+                    for box in result.boxes:
+                        cls_id = int(box.cls.cpu().numpy()[0])
+                        
+                        if cls_id in self.vehicle_classes:
+                            conf = float(box.conf.cpu().numpy()[0])
+                            xyxy = box.xyxy.cpu().numpy()[0]
+                            
+                            box_dict = {
+                                "xmin": float(xyxy[0]),
+                                "ymin": float(xyxy[1]),
+                                "xmax": float(xyxy[2]),
+                                "ymax": float(xyxy[3]),
+                            }
+                            
+                            is_complete = self._is_fully_visible(box_dict, img_width, img_height)
+                            
+                            detection = {
+                                "class": self.vehicle_classes[cls_id],
+                                "confidence": conf,
+                                "box": box_dict,
+                                "is_complete": is_complete,
+                            }
+                            
+                            detections.append(detection)
+                            boxes_overlay.append((xyxy, conf, self.vehicle_classes[cls_id], is_complete))
+                            
+                            if is_complete:
+                                valid_detections.append(detection)
+                            else:
+                                skipped_cutoff += 1
+                
+                overlay_b64 = self._create_yolo_overlay(images[idx], boxes_overlay)
+                
+                batch_outputs.append({
+                    "count": len(valid_detections),
+                    "detections": detections,
+                    "overlay_image": overlay_b64,
+                    "source": "yolo"
+                })
+                
+            return batch_outputs
+
+        except Exception as e:
+            logger.error(f"[YOLO] Batch Error: {e}")
+            return [{"count": 0, "detections": [], "source": "error", "error": str(e)} for _ in images]
+
 
     def _create_sam3_overlay(
         self, image: Image.Image, masks, boxes: List

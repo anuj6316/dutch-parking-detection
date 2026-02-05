@@ -17,6 +17,8 @@ export interface Space {
 
     geoBoundingBox?: [number, number, number, number];
     geoPolygon?: [number, number][];
+    geoObbCorners?: [number, number][];
+    googleMapsLink?: string;
 
     vlmVerified?: boolean | null;
     vlmReason?: string;
@@ -138,6 +140,8 @@ export interface DetectionResult {
     is_occupied: boolean;
     geoBoundingBox: [number, number, number, number];
     geoPolygon: [number, number][];
+    geo_obb_corners?: [number, number][];
+    google_maps_link?: string;
     area_sq_meters: number;
     estimated_capacity: number;
     cropped_image?: string;

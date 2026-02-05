@@ -223,6 +223,25 @@ class OBBMerger:
                 merged_det[poly_key] = [list(p) for p in coords]
                 min_lat, min_lng, max_lat, max_lng = merged_poly.bounds
                 merged_det[bbox_key] = [min_lat, min_lng, max_lat, max_lng]
+                
+                # Recalculate Google Maps link for merged detection
+                center_lat = (min_lat + max_lat) / 2
+                center_lng = (min_lng + max_lng) / 2
+                merged_det['google_maps_link'] = f"https://www.google.com/maps/search/?api=1&query={center_lat},{center_lng}"
+
+                # Calculate real OBB corners (minimum rotated rectangle)
+                try:
+                    rotated_rect = merged_poly.minimum_rotated_rectangle
+                    rect_coords = list(rotated_rect.exterior.coords)
+                    # Take first 4 distinct points (exterior.coords usually has 5 points, last=first)
+                    merged_det['geo_obb_corners'] = [list(p) for p in rect_coords[:4]]
+                except Exception as e:
+                    logger.warning(f"[OBBMerger] Failed to calculate OBB corners: {e}")
+                    # Fallback to bbox corners if rotation fails
+                    merged_det['geo_obb_corners'] = [
+                        [min_lat, min_lng], [max_lat, min_lng],
+                        [max_lat, max_lng], [min_lat, max_lng]
+                    ]
             else:
                 flat_coords = []
                 for x, y in coords:

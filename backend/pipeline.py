@@ -61,22 +61,44 @@ class PipelineOrchestrator:
                 mask_b64 = encode_image(mask)
                 all_masks.append({"tile_index": tile_idx, "mask": mask_b64})
 
-                # STEP 4: Vehicle Detection
+                # STEP 4: Vehicle Detection (Batch Processing)
                 tile_detections = []
                 total_vehicles = 0
-
-                for det in detections:
-                    # Check for cancellation inside the vehicle counting loop
-                    await asyncio.sleep(0)
-                    
+                
+                # Prepare batch inputs
+                batch_crops = []
+                batch_indices = []
+                
+                for det_idx, det in enumerate(detections):
                     # Use OBB crop if polygon is available, otherwise fallback to bbox crop
                     if "polygon" in det and det["polygon"] and len(det["polygon"]) == 8:
                         cropped = crop_obb_region(image, det["polygon"])
                     else:
                         cropped = crop_from_bbox(image, det["bbox"])
                     
-                    # Vehicle Counting (Offloaded to executor)
-                    vehicle_result = await loop.run_in_executor(None, vehicle_counter.count_vehicles, cropped, 0.5)
+                    batch_crops.append(cropped)
+                    batch_indices.append(det_idx)
+
+                # Process batch if there are detections
+                batch_results = []
+                if batch_crops:
+                    # Vehicle Counting (Offloaded to executor for thread safety, though batching happens inside)
+                    # Note: We pass the list of images to the batch method
+                    batch_results = await loop.run_in_executor(
+                        None, 
+                        vehicle_counter.count_vehicles_batch, 
+                        batch_crops, 
+                        0.5
+                    )
+                
+                # Map results back to detections
+                for i, det_idx in enumerate(batch_indices):
+                    # Check for cancellation
+                    if i % 10 == 0:
+                        await asyncio.sleep(0)
+
+                    det = detections[det_idx]
+                    vehicle_result = batch_results[i]
                     
                     vehicle_count = vehicle_result["count"]
                     total_vehicles += vehicle_count
@@ -89,8 +111,8 @@ class PipelineOrchestrator:
                     geo_polygon = []
                     if "polygon" in det and det["polygon"]:
                         poly_points = det["polygon"]
-                        for i in range(0, len(poly_points) - 1, 2):
-                            px, py = max(0, min(img_w - 1, float(poly_points[i]))), max(0, min(img_h - 1, float(poly_points[i+1])))
+                        for k in range(0, len(poly_points) - 1, 2):
+                            px, py = max(0, min(img_w - 1, float(poly_points[k]))), max(0, min(img_h - 1, float(poly_points[k+1])))
                             lat, lng = pixel_to_geo(px, py, img_w, img_h, tile_bounds)
                             geo_polygon.append([lat, lng])
                         if geo_polygon and geo_polygon[0] != geo_polygon[-1]:
@@ -98,6 +120,22 @@ class PipelineOrchestrator:
 
                     lats, lngs = [p[0] for p in geo_polygon], [p[1] for p in geo_polygon]
                     geo_bbox = [min(lats), min(lngs), max(lats), max(lngs)] if geo_polygon else [0,0,0,0]
+                    
+                    # Calculate center for Google Maps link
+                    center_lat = sum(lats) / len(lats) if lats else 0
+                    center_lng = sum(lngs) / len(lngs) if lngs else 0
+                    google_maps_link = f"https://www.google.com/maps/search/?api=1&query={center_lat},{center_lng}"
+                    
+                    # Calculate OBB corners (Lat/Lng) for export
+                    if geo_polygon and len(geo_polygon) >= 4:
+                        geo_obb_corners = geo_polygon[:4]
+                    else:
+                        # Fallback to bbox corners
+                        min_lat, min_lng, max_lat, max_lng = geo_bbox
+                        geo_obb_corners = [
+                            [min_lat, min_lng], [max_lat, min_lng],
+                            [max_lat, max_lng], [min_lat, max_lng]
+                        ]
 
                     obb_coords = det["polygon"] if "polygon" in det and det["polygon"] else bbox_to_obb(det["bbox"])
                     capacity = estimate_parking_capacity(obb_coords, spot_type="standard")
@@ -109,10 +147,12 @@ class PipelineOrchestrator:
                         "is_occupied": vehicle_count > 0,
                         "geoBoundingBox": geo_bbox,
                         "geoPolygon": geo_polygon,
+                        "geo_obb_corners": geo_obb_corners,
+                        "google_maps_link": google_maps_link,
                         "area_sq_meters": capacity["area_sq_meters"],
                         "estimated_capacity": capacity["estimated_capacity"],
                         "dimensions_meters": capacity["dimensions_meters"],
-                        "cropped_image": encode_image(cropped),
+                        "cropped_image": encode_image(batch_crops[i]),
                         "cropped_overlay": vehicle_result.get("overlay_image"),
                     })
 

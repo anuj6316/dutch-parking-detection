@@ -212,6 +212,8 @@ export const useParkingAnalysis = ({ apiKey }: UseParkingAnalysisProps) => {
                     localBoundingBox: null,
                     geoBoundingBox: det.geoBoundingBox,
                     geoPolygon: geoPolygon,
+                    geoObbCorners: det.geo_obb_corners,
+                    googleMapsLink: det.google_maps_link,
                     areaSqMeters: det.area_sq_meters,
                     estimatedCapacity: det.estimated_capacity,
                     dimensionsMeters: det.dimensions_meters

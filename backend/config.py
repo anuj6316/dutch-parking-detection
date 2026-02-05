@@ -8,7 +8,7 @@ load_dotenv(dotenv_path=env_path)
 
 class Settings:
     # Model Configuration
-    SKIP_SAM3_LOADING: bool = os.getenv("SKIP_SAM3_LOADING", "True").lower() == "true"
+    SKIP_SAM3_LOADING: bool = os.getenv("SKIP_SAM3_LOADING", "False").lower() == "true"
     MODEL_PATH: str = os.getenv("MODEL_PATH", str(Path(__file__).parent.parent / "yolo26s-obb-heavy-aug6/weights/best.pt"))
     
     # API Configuration

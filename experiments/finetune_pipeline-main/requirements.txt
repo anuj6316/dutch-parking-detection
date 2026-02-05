@@ -1,0 +1,24 @@
+# ===============================
+# DATASET GENERATION
+# ===============================
+pypdf
+python-docx
+requests
+
+# ===============================
+# TRAINING CORE
+# ===============================
+datasets
+transformers>=4.40.0
+accelerate
+trl
+peft
+sentencepiece
+protobuf
+numpy
+
+# ===============================
+# NOTE:
+# Install torch + unsloth manually
+# (GPU specific — cannot safely pin here)
+# ===============================

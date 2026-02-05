@@ -14,26 +14,7 @@ CONFIG = {
     "retry_attempts": 3,
 }
 
-def deg2num(lat_deg, lon_deg, zoom):
-    """
-    Converts Latitude and Longitude into Tile Coordinates (X, Y).
-    This is based on the Slippy Map Tilenames math.
-    """
-    lat_rad = math.radians(lat_deg)
-    n = 2.0 ** zoom
-    xtile = int((lon_deg + 180.0) / 360.0 * n)
-    ytile = int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n)
-    return (xtile, ytile)
-
-def num2deg(xtile, ytile, zoom):
-    """
-    Converts Tile Coordinates (X, Y) back to Latitude and Longitude (Top-Left corner).
-    """
-    n = 2.0 ** zoom
-    lon_deg = xtile / n * 360.0 - 180.0
-    lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * ytile / n)))
-    lat_deg = math.degrees(lat_rad)
-    return (lat_deg, lon_deg)
+from geo_utils import deg2num, num2deg, get_tile_bounds
 
 def get_grid_bounds(lat, lng):
     """

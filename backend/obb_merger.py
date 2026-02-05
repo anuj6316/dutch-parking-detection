@@ -59,113 +59,122 @@ class OBBMerger:
         detections: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        Merge overlapping OBB detections into single polygons.
-        
-        Args:
-            detections: List of detection dicts with 'bbox' and/or 'polygon' keys
-            
-        Returns:
-            List of merged detections with combined polygons
+        Merge overlapping OBB detections in pixel coordinates.
         """
-        if not self.enabled or not self.available or len(detections) == 0:
+        if not self.enabled or not self.available or len(detections) <= 1:
             return detections
         
-        if len(detections) == 1:
+        return self._merge_generic(
+            detections, 
+            polygon_key="polygon", 
+            bbox_key="bbox",
+            is_geo=False
+        )
+
+    def merge_geospatial_detections(
+        self,
+        detections: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Merge overlapping detections in geospatial coordinates (lat/lng).
+        """
+        if not self.available or len(detections) <= 1:
             return detections
+            
+        return self._merge_generic(
+            detections,
+            polygon_key="geoPolygon",
+            bbox_key="geoBoundingBox",
+            is_geo=True
+        )
+
+    def _merge_generic(
+        self, 
+        detections: List[Dict[str, Any]], 
+        polygon_key: str, 
+        bbox_key: str,
+        is_geo: bool = False
+    ) -> List[Dict[str, Any]]:
+        """Generic merging logic for both pixel and geo coordinates."""
         
-        logger.info(f"[OBBMerger] Processing {len(detections)} detections for merging (IoU={self.iou_threshold}, overlap={self.min_overlap_area}, max_dist={self.max_distance})")
-        
-        # Convert detections to Shapely polygons
+        # 1. Convert detections to Shapely polygons
         polygons_with_data = []
-        invalid_count = 0
         for idx, det in enumerate(detections):
-            poly = self._detection_to_polygon(det)
-            if poly:
-                # Try to fix invalid geometries
-                if not poly.is_valid:
-                    poly = poly.buffer(0)  # Fix self-intersections
-                
+            poly = self._get_polygon(det, polygon_key, bbox_key, is_geo)
+            if poly and poly.is_valid and poly.area > 0:
+                polygons_with_data.append({
+                    'polygon': poly,
+                    'detection': det,
+                    'index': idx
+                })
+            elif poly and not poly.is_valid:
+                poly = poly.buffer(0)
                 if poly.is_valid and poly.area > 0:
                     polygons_with_data.append({
                         'polygon': poly,
                         'detection': det,
                         'index': idx
                     })
-                else:
-                    invalid_count += 1
-                    logger.debug(f"[OBBMerger] Invalid or zero-area polygon at index {idx}")
-            else:
-                invalid_count += 1
-                logger.debug(f"[OBBMerger] Could not convert detection {idx} to polygon")
-        
-        if invalid_count > 0:
-            logger.warning(f"[OBBMerger] Skipped {invalid_count} invalid detections out of {len(detections)}")
-        
-        if len(polygons_with_data) == 0:
-            logger.warning("[OBBMerger] No valid polygons to merge")
+
+        if not polygons_with_data:
             return detections
-        
-        # Group overlapping polygons
+
+        # 2. Group overlapping polygons
         groups = self._group_overlapping_polygons(polygons_with_data)
-        logger.info(f"[OBBMerger] Found {len(groups)} groups (from {len(polygons_with_data)} detections)")
         
-        # Merge each group
+        # 3. Merge each group
         merged_detections = []
-        for group_idx, group in enumerate(groups):
+        for group in groups:
             if len(group) == 1:
-                # Single detection, no merging needed
                 merged_detections.append(group[0]['detection'])
             else:
-                # Merge multiple detections
-                merged = self._merge_group(group)
+                merged = self._merge_group(group, polygon_key, bbox_key, is_geo)
                 if merged:
                     merged_detections.append(merged)
-                    logger.info(f"[OBBMerger] Group {group_idx}: Merged {len(group)} detections")
+                else:
+                    merged_detections.extend([item['detection'] for item in group])
         
-        reduction = len(detections) - len(merged_detections)
-        if reduction > 0:
-            logger.info(f"[OBBMerger] Successfully merged: {len(detections)} → {len(merged_detections)} polygons (reduced by {reduction})")
-        else:
-            logger.info(f"[OBBMerger] No merging occurred: {len(detections)} detections remain")
         return merged_detections
-    
-    def _detection_to_polygon(self, det: Dict[str, Any]) -> Polygon:
-        """Convert detection dict to Shapely Polygon."""
+
+    def _get_polygon(self, det: Dict[str, Any], poly_key: str, bbox_key: str, is_geo: bool) -> Polygon:
+        """Extract polygon from detection dict."""
         try:
-            if "polygon" in det and det["polygon"]:
-                # OBB polygon: [x1, y1, x2, y2, x3, y3, x4, y4, ...]
-                points = det["polygon"]
-                if len(points) >= 6:  # Need at least 3 points (6 coordinates)
-                    coords = [(float(points[i]), float(points[i+1])) for i in range(0, len(points)-1, 2)]
-                    # Ensure polygon is closed
-                    if len(coords) > 0 and coords[0] != coords[-1]:
-                        coords.append(coords[0])
-                    if len(coords) >= 3:
-                        return Polygon(coords)
-            elif "bbox" in det and det["bbox"]:
-                # Standard bounding box: [x1, y1, x2, y2]
-                bbox = det["bbox"]
-                if len(bbox) >= 4:
-                    x1, y1, x2, y2 = float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])
-                    return Polygon([(x1, y1), (x2, y1), (x2, y2), (x1, y2), (x1, y1)])
-        except Exception as e:
-            logger.debug(f"[OBBMerger] Error converting detection to polygon: {e}")
-        
+            coords_data = det.get(poly_key)
+            if coords_data:
+                if is_geo:
+                    # geoPolygon is [[lat, lng], [lat, lng], ...]
+                    # Shapely wants (lng, lat) for proper GeoJSON-like handling if we were using CRS,
+                    # but here we just need consistency. Let's stick to (lng, lat) as per common practice.
+                    # WAIT: The pipeline uses [lat, lng]. Let's stay consistent with what it expects.
+                    coords = [tuple(p) for p in coords_data]
+                else:
+                    # pixel polygon is [x1, y1, x2, y2, ...]
+                    coords = [(float(coords_data[i]), float(coords_data[i+1])) for i in range(0, len(coords_data)-1, 2)]
+                
+                if len(coords) >= 3:
+                    return Polygon(coords)
+            
+            # Fallback to bbox
+            bbox = det.get(bbox_key)
+            if bbox and len(bbox) >= 4:
+                if is_geo:
+                    # geoBoundingBox: [minLat, minLng, maxLat, maxLng]
+                    min_lat, min_lng, max_lat, max_lng = bbox
+                    return Polygon([(min_lat, min_lng), (max_lat, min_lng), (max_lat, max_lng), (min_lat, max_lng)])
+                else:
+                    # bbox: [x1, y1, x2, y2]
+                    x1, y1, x2, y2 = bbox
+                    return Polygon([(x1, y1), (x2, y1), (x2, y2), (x1, y2)])
+        except Exception:
+            pass
         return None
-    
+
     def _group_overlapping_polygons(
         self, 
         polygons_with_data: List[Dict]
     ) -> List[List[Dict]]:
-        """
-        Group polygons that overlap with each other.
-        Uses union-find approach to find connected components.
-        """
+        """Group polygons that overlap using Union-Find."""
         n = len(polygons_with_data)
-        if n == 0:
-            return []
-        
-        # Union-Find data structure
         parent = list(range(n))
         
         def find(x):
@@ -178,20 +187,11 @@ class OBBMerger:
             if px != py:
                 parent[px] = py
         
-        # Check all pairs for overlap
-        overlaps_found = 0
         for i in range(n):
             for j in range(i + 1, n):
-                poly1 = polygons_with_data[i]['polygon']
-                poly2 = polygons_with_data[j]['polygon']
-                
-                if self._polygons_overlap(poly1, poly2):
+                if polygons_with_data[i]['polygon'].intersects(polygons_with_data[j]['polygon']):
                     union(i, j)
-                    overlaps_found += 1
         
-        logger.debug(f"[OBBMerger] Found {overlaps_found} overlapping pairs out of {n * (n-1) // 2} total pairs")
-        
-        # Group by root parent
         groups_dict = {}
         for idx in range(n):
             root = find(idx)
@@ -200,124 +200,68 @@ class OBBMerger:
             groups_dict[root].append(polygons_with_data[idx])
         
         return list(groups_dict.values())
-    
-    def _polygons_overlap(self, poly1: Polygon, poly2: Polygon) -> bool:
-        """Check if two polygons should be merged based on overlap or proximity."""
-        # Check if polygons intersect
-        if poly1.intersects(poly2):
-            # Calculate IoU
-            intersection = poly1.intersection(poly2)
-            if not intersection.is_empty:
-                intersection_area = intersection.area
-                union_area = poly1.union(poly2).area
-                
-                if union_area > 0:
-                    iou = intersection_area / union_area
-                    
-                    # Also check if overlap area is significant relative to smaller polygon
-                    min_area = min(poly1.area, poly2.area)
-                    if min_area > 0:
-                        overlap_ratio = intersection_area / min_area
-                        
-                        # Merge if IoU > threshold OR overlap area > min_overlap_area of smaller polygon
-                        if iou >= self.iou_threshold or overlap_ratio >= self.min_overlap_area:
-                            return True
-        
-        # Check distance for adjacent boxes (even without overlap)
-        # Calculate minimum distance between polygons
-        distance = poly1.distance(poly2)
-        
-        if distance <= self.max_distance:
-            # For very close boxes, merge them. The area ratio check was too strict
-            # and prevented merging of adjacent fragments of different sizes.
-            return True
-        
-        return False
-    
-    def _merge_group(self, group: List[Dict]) -> Dict[str, Any]:
-        """
-        Merge a group of overlapping detections into a single detection.
-        
-        Strategy:
-        1. Union all polygons
-        2. Take convex hull or union boundary
-        3. Aggregate metadata (confidence, vehicle counts, etc.)
-        """
-        if len(group) == 0:
-            return None
-        
-        polygons = [item['polygon'] for item in group]
-        detections = [item['detection'] for item in group]
-        
-        # Union all polygons
+
+    def _merge_group(self, group: List[Dict], poly_key: str, bbox_key: str, is_geo: bool) -> Dict[str, Any]:
+        """Merge a group of polygons and aggregate metadata."""
         try:
-            if len(polygons) == 1:
-                merged_poly = polygons[0]
-            else:
-                # Use unary_union for efficient merging
-                merged_poly = unary_union(polygons)
+            polygons = [item['polygon'] for item in group]
+            detections = [item['detection'] for item in group]
             
-            # If result is MultiPolygon, take the largest component
+            merged_poly = unary_union(polygons)
             if isinstance(merged_poly, MultiPolygon):
                 merged_poly = max(merged_poly.geoms, key=lambda p: p.area)
             
-            # Optionally use convex hull for smoother boundaries
-            # merged_poly = merged_poly.convex_hull
-            
-            # Extract coordinates
             if not merged_poly.is_valid:
-                # Try to fix invalid geometry
                 merged_poly = merged_poly.buffer(0)
             
-            # Get exterior coordinates
-            coords = list(merged_poly.exterior.coords)
-            # Remove duplicate closing point (Shapely includes it, but we'll add it back if needed)
-            if len(coords) > 0 and coords[0] == coords[-1]:
-                coords = coords[:-1]
-            
-            # Flatten to [x1, y1, x2, y2, ...] format
-            # Ensure we have at least 3 points (6 coordinates)
-            if len(coords) < 3:
-                logger.warning(f"[OBBMerger] Merged polygon has only {len(coords)} points, using original")
-                return detections[0]
-            
-            polygon_flat = []
-            for x, y in coords:
-                polygon_flat.extend([float(x), float(y)])
-            
-            logger.debug(f"[OBBMerger] Merged polygon has {len(coords)} points ({len(polygon_flat)} coordinates)")
-            
-            # Aggregate metadata from all detections
-            confidences = [d.get('confidence', 0.0) for d in detections]
-            avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
-            
-            # Use the first detection as base, update with merged data
+            # Base detection from the first one
             merged_det = detections[0].copy()
-            merged_det['polygon'] = polygon_flat
-            merged_det['bbox'] = self._polygon_to_bbox(merged_poly)
-            merged_det['confidence'] = avg_confidence
-            merged_det['merged_count'] = len(group)
-            # Note: vehicle_count and is_occupied will be calculated later in the pipeline
             
-            # Recalculate capacity based on merged polygon area
-            if 'area_sq_meters' in merged_det:
-                # Estimate area from polygon
-                area_pixels = merged_poly.area
-                # Assuming 5cm per pixel (PDOK resolution)
-                area_sq_meters = area_pixels * (0.05 ** 2)
-                merged_det['area_sq_meters'] = round(area_sq_meters, 2)
+            # Update Polygon and BBox
+            coords = list(merged_poly.exterior.coords)
+            if is_geo:
+                merged_det[poly_key] = [list(p) for p in coords]
+                min_lat, min_lng, max_lat, max_lng = merged_poly.bounds
+                merged_det[bbox_key] = [min_lat, min_lng, max_lat, max_lng]
+            else:
+                flat_coords = []
+                for x, y in coords:
+                    flat_coords.extend([float(x), float(y)])
+                merged_det[poly_key] = flat_coords
+                bounds = merged_poly.bounds
+                merged_det[bbox_key] = [float(bounds[0]), float(bounds[1]), float(bounds[2]), float(bounds[3])]
+            
+            # Aggregate metadata
+            merged_det['vehicle_count'] = sum(d.get('vehicle_count', 0) for d in detections)
+            merged_det['is_occupied'] = merged_det['vehicle_count'] > 0
+            merged_det['estimated_capacity'] = sum(d.get('estimated_capacity', 0) for d in detections)
+            merged_det['area_sq_meters'] = sum(d.get('area_sq_meters', 0) for d in detections)
+            merged_det['merged_count'] = sum(d.get('merged_count', 1) for d in detections)
+            
+            # Confidence aggregation
+            all_conf = []
+            for d in detections:
+                c = d.get('confidence', [])
+                if isinstance(c, list):
+                    all_conf.extend(c)
+                else:
+                    all_conf.append(c)
+            
+            if all_conf:
+                # If we're merging geo-detections, we might want to keep the list of confidences
+                # or average them. The pipeline expects a list of confidences for some reason.
+                if is_geo:
+                    # Simple average for now, but keeping it in a list to match original behavior
+                    merged_det['confidence'] = [sum(all_conf) / len(all_conf)]
+                else:
+                    merged_det['confidence'] = sum(all_conf) / len(all_conf)
             
             return merged_det
             
         except Exception as e:
             logger.error(f"[OBBMerger] Error merging group: {e}")
-            # Return first detection as fallback
-            return detections[0]
-    
-    def _polygon_to_bbox(self, poly: Polygon) -> List[float]:
-        """Convert Shapely polygon to axis-aligned bounding box."""
-        bounds = poly.bounds  # (minx, miny, maxx, maxy)
-        return [float(bounds[0]), float(bounds[1]), float(bounds[2]), float(bounds[3])]
+            return None
+
 
 
 # Singleton instance - More aggressive thresholds for better merging

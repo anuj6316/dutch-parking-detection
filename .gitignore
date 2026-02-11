@@ -51,3 +51,12 @@ yolov26x/*
 
 references/
 references/*
+
+SLM/
+SLM/*
+
+crop_obb/
+crop_obb/*
+
+crop_obb_val/
+crop_obb_val/*

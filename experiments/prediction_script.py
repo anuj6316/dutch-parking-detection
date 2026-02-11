@@ -12,7 +12,7 @@ from ultralytics import YOLO
 # model = YOLO("/home/mindmap/Desktop/dutch-parking-detection/models/best_6.pt")
 
 # model = YOLO("/home/mindmap/Desktop/dutch-parking-detection/yolov26x/yolov26x-dataset1234-310120265/weights/best.pt")
-model = YOLO("/home/mindmap/Desktop/dutch-parking-detection/runs/obb/trained_models/yolov26x/yolov26x-dataset1234-02022026_2/weights/best.pt") ## LIVE
+model = YOLO("/home/mindmap/Desktop/dutch-parking-detection/runs/obb/trained_models/yolov26x/satellite_parking_final6/weights/best.pt") ## LIVE
 result = model.predict(
     # source="/home/mindmap/Desktop/dutch-parking-detection/backend/public/merged-images/amersfoort",
     source="/home/mindmap/Desktop/dutch-parking-detection/dataset/val/images",

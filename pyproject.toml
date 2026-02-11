@@ -3,7 +3,7 @@ name = "dutch-parking-detection"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "accelerate>=0.20.0",
     "bitsandbytes>=0.41.0",
